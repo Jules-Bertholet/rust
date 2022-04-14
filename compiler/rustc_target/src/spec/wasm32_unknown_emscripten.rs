@@ -22,9 +22,12 @@ pub fn target() -> Target {
             "-s".into(),
             "ASSERTIONS=1".into(),
             "-s".into(),
+            "DISABLE_EXCEPTION_THROWING=1".into(),
+            "-s".into(),
             "DISABLE_EXCEPTION_CATCHING=1".into(),
             "-s".into(),
             "ABORTING_MALLOC=0".into(),
+            "-fno-exceptions".into(),
             "-Wl,--fatal-warnings".into(),
         ],
     );
