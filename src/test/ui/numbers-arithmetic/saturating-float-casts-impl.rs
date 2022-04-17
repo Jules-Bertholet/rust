@@ -167,8 +167,6 @@ impl FloatToInt<u64> for f64 {
         self.to_int_unchecked()
     }
 }
-// FIXME emscripten does not support i128
-#[cfg(not(target_os = "emscripten"))]
 impl FloatToInt<i128> for f64 {
     fn cast(self) -> i128 {
         self as _
@@ -177,8 +175,6 @@ impl FloatToInt<i128> for f64 {
         self.to_int_unchecked()
     }
 }
-// FIXME emscripten does not support i128
-#[cfg(not(target_os = "emscripten"))]
 impl FloatToInt<u128> for f64 {
     fn cast(self) -> u128 {
         self as _
@@ -335,17 +331,13 @@ fn casts() {
     assert_eq::<u64>(f64::NAN as u64, 0);
     assert_eq::<u64>((-f64::NAN) as u64, 0);
 
-    // FIXME emscripten does not support i128
-    #[cfg(not(target_os = "emscripten"))]
-    {
-        // f64 -> i128
-        assert_eq::<i128>(f64::MAX as i128, i128::MAX);
-        assert_eq::<i128>(f64::MIN as i128, i128::MIN);
+    // f64 -> i128
+    assert_eq::<i128>(f64::MAX as i128, i128::MAX);
+    assert_eq::<i128>(f64::MIN as i128, i128::MIN);
 
-        // f64 -> u128
-        assert_eq::<u128>(f64::MAX as u128, u128::MAX);
-        assert_eq::<u128>(f64::MIN as u128, 0);
-    }
+    // f64 -> u128
+    assert_eq::<u128>(f64::MAX as u128, u128::MAX);
+    assert_eq::<u128>(f64::MIN as u128, 0);
 
     // int -> f32
     assert_eq::<f32>(127i8 as f32, 127.0);
@@ -372,12 +364,8 @@ fn casts() {
         0xffdfffffdfffffffu64 as i64 as f32,
         /*-0x1.000002p+53*/ f32::from_bits(0xda000001),
     );
-    // FIXME emscripten does not support i128
-    #[cfg(not(target_os = "emscripten"))]
-    {
-        assert_eq::<f32>(i128::MIN as f32, -170141183460469231731687303715884105728.0f32);
-        assert_eq::<f32>(u128::MAX as f32, f32::INFINITY); // saturation
-    }
+    assert_eq::<f32>(i128::MIN as f32, -170141183460469231731687303715884105728.0f32);
+    assert_eq::<f32>(u128::MAX as f32, f32::INFINITY); // saturation
 
     // int -> f64
     assert_eq::<f64>(127i8 as f64, 127.0);
@@ -392,12 +380,9 @@ fn casts() {
     assert_eq::<f64>(-9007199254740993i64 as f64, -9007199254740992.0);
     assert_eq::<f64>(9007199254740995i64 as f64, 9007199254740996.0);
     assert_eq::<f64>(-9007199254740995i64 as f64, -9007199254740996.0);
-    // FIXME emscripten does not support i128
-    #[cfg(not(target_os = "emscripten"))]
-    {
-        // even that fits...
-        assert_eq::<f64>(u128::MAX as f64, 340282366920938463463374607431768211455.0f64);
-    }
+    // even that fits...
+    assert_eq::<f64>(u128::MAX as f64, 340282366920938463463374607431768211455.0f64);
+
 
     // f32 -> f64
     assert_eq::<u64>((0.0f32 as f64).to_bits(), 0.0f64.to_bits());
@@ -455,12 +440,8 @@ pub fn run() {
 
     common_fptoi_tests!(f* -> i8 i16 i32 i64 u8 u16 u32 u64);
     fptoui_tests!(f* -> u8 u16 u32 u64);
-    // FIXME emscripten does not support i128
-    #[cfg(not(target_os = "emscripten"))]
-    {
-        common_fptoi_tests!(f* -> i128 u128);
-        fptoui_tests!(f* -> u128);
-    }
+    common_fptoi_tests!(f* -> i128 u128);
+    fptoui_tests!(f* -> u128);
 
     // The following tests cover edge cases for some integer types.
 
@@ -492,12 +473,9 @@ pub fn run() {
     test!(4294967296., f* -> u32, 4294967295);
 
     // # u128
-    #[cfg(not(target_os = "emscripten"))]
-    {
-        // float->int:
-        test!(f32::MAX, f32 -> u128, 0xffffff00000000000000000000000000);
-        // nextDown(f32::MAX) = 2^128 - 2 * 2^104
-        const SECOND_LARGEST_F32: f32 = 340282326356119256160033759537265639424.;
-        test!(SECOND_LARGEST_F32, f32 -> u128, 0xfffffe00000000000000000000000000);
-    }
+    // float->int:
+    test!(f32::MAX, f32 -> u128, 0xffffff00000000000000000000000000);
+    // nextDown(f32::MAX) = 2^128 - 2 * 2^104
+    const SECOND_LARGEST_F32: f32 = 340282326356119256160033759537265639424.;
+    test!(SECOND_LARGEST_F32, f32 -> u128, 0xfffffe00000000000000000000000000);
 }

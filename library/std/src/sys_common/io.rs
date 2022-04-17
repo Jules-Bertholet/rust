@@ -3,7 +3,7 @@
 pub const DEFAULT_BUF_SIZE: usize = if cfg!(target_os = "espidf") { 512 } else { 8 * 1024 };
 
 #[cfg(test)]
-#[allow(dead_code)] // not used on emscripten
+#[cfg_attr(target_os = "emscripten", allow(dead_code))] // not used on emscripten
 pub mod test {
     use crate::env;
     use crate::fs;
