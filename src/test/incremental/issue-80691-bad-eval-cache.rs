@@ -1,6 +1,7 @@
 // revisions: rfail1 rfail2
 // failure-status: 101
 // error-pattern: not implemented
+// ignore-emscripten runs via node, so different status reported
 
 pub trait Interner {
     type InternedVariableKinds;

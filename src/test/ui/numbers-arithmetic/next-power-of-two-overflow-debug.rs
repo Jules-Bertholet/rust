@@ -1,7 +1,6 @@
 // run-pass
 // compile-flags: -C debug_assertions=yes
 // needs-unwind
-// ignore-emscripten dies with an LLVM error
 
 use std::panic;
 

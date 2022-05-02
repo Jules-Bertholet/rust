@@ -349,11 +349,13 @@ pub fn iter_100(b: &mut Bencher) {
 }
 
 #[bench]
+#[cfg_attr(target_arch = "wasm32", ignore)] // not enough memory
 pub fn iter_10k(b: &mut Bencher) {
     bench_iter(b, 1_000, 10_000);
 }
 
 #[bench]
+#[cfg_attr(target_arch = "wasm32", ignore)] // not enough memory
 pub fn iter_1m(b: &mut Bencher) {
     bench_iter(b, 1_000, 1_000_000);
 }

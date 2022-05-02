@@ -1,6 +1,6 @@
 // run-pass
 // compile-flags:--test
-// ignore-emscripten
+// ignore-emscripten no threads support
 
 use std::sync::mpsc::channel;
 use std::sync::mpsc::TryRecvError;

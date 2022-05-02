@@ -343,8 +343,9 @@ reverse!(reverse_simd_f64x4, F64x4, |x| {
 });
 
 macro_rules! rotate {
-    ($name:ident, $gen:expr, $len:expr, $mid:expr) => {
+    ($(#[$attr:meta])* $name:ident, $gen:expr, $len:expr, $mid:expr) => {
         #[bench]
+        $(#[$attr])*
         fn $name(b: &mut Bencher) {
             let size = mem::size_of_val(&$gen(1)[0]);
             let mut v = $gen($len * 8 / size);
@@ -366,14 +367,81 @@ rotate!(rotate_medium_half, gen_random, 9158, 9158 / 2);
 rotate!(rotate_medium_half_plus_one, gen_random, 9158, 9158 / 2 + 1);
 
 // Intended to use more RAM than the machine has cache
-rotate!(rotate_huge_by1, gen_random, 5 * 1024 * 1024, 1);
-rotate!(rotate_huge_by9199_u64, gen_random, 5 * 1024 * 1024, 9199);
-rotate!(rotate_huge_by9199_bytes, gen_random_bytes, 5 * 1024 * 1024, 9199);
-rotate!(rotate_huge_by9199_strings, gen_strings, 5 * 1024 * 1024, 9199);
-rotate!(rotate_huge_by9199_big, gen_big_random, 5 * 1024 * 1024, 9199);
-rotate!(rotate_huge_by1234577_u64, gen_random, 5 * 1024 * 1024, 1234577);
-rotate!(rotate_huge_by1234577_bytes, gen_random_bytes, 5 * 1024 * 1024, 1234577);
-rotate!(rotate_huge_by1234577_strings, gen_strings, 5 * 1024 * 1024, 1234577);
-rotate!(rotate_huge_by1234577_big, gen_big_random, 5 * 1024 * 1024, 1234577);
-rotate!(rotate_huge_half, gen_random, 5 * 1024 * 1024, 5 * 1024 * 1024 / 2);
-rotate!(rotate_huge_half_plus_one, gen_random, 5 * 1024 * 1024, 5 * 1024 * 1024 / 2 + 1);
+// Wam doesn't have enough memory to run these.
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by1,
+    gen_random,
+    5 * 1024 * 1024,
+    1
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by9199_u64,
+    gen_random,
+    5 * 1024 * 1024,
+    9199
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by9199_bytes,
+    gen_random_bytes,
+    5 * 1024 * 1024,
+    9199
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by9199_strings,
+    gen_strings,
+    5 * 1024 * 1024,
+    9199
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by9199_big,
+    gen_big_random,
+    5 * 1024 * 1024,
+    9199
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by1234577_u64,
+    gen_random,
+    5 * 1024 * 1024,
+    1234577
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by1234577_bytes,
+    gen_random_bytes,
+    5 * 1024 * 1024,
+    1234577
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by1234577_strings,
+    gen_strings,
+    5 * 1024 * 1024,
+    1234577
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_by1234577_big,
+    gen_big_random,
+    5 * 1024 * 1024,
+    1234577
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_half,
+    gen_random,
+    5 * 1024 * 1024,
+    5 * 1024 * 1024 / 2
+);
+rotate!(
+    #[cfg_attr(target_arch = "wasm32", ignore)]
+    rotate_huge_half_plus_one,
+    gen_random,
+    5 * 1024 * 1024,
+    5 * 1024 * 1024 / 2 + 1
+);

@@ -534,6 +534,7 @@ fn recursive_mkdir_failure() {
 }
 
 #[test]
+#[cfg_attr(target_os = "emscripten", ignore)] // no threads
 fn concurrent_recursive_mkdir() {
     for _ in 0..100 {
         let dir = tmpdir();
@@ -632,10 +633,7 @@ fn recursive_rmdir_of_file_symlink() {
     let f2 = tmpdir.join("f2");
     check!(check!(File::create(&f1)).write(b"foo"));
     check!(symlink_file(&f1, &f2));
-    match fs::remove_dir_all(&f2) {
-        Ok(..) => panic!("wanted a failure"),
-        Err(..) => {}
-    }
+    assert!(fs::remove_dir_all(&f2).is_err());
 }
 
 #[test]
@@ -728,13 +726,9 @@ fn copy_file_does_not_exist() {
     let from = Path::new("test/nonexistent-bogus-path");
     let to = Path::new("test/other-bogus-path");
 
-    match fs::copy(&from, &to) {
-        Ok(..) => panic!(),
-        Err(..) => {
-            assert!(!from.exists());
-            assert!(!to.exists());
-        }
-    }
+    assert!(fs::copy(&from, &to).is_err());
+    assert!(!from.exists());
+    assert!(!to.exists());
 }
 
 #[test]
@@ -771,10 +765,7 @@ fn copy_file_dst_dir() {
     let out = tmpdir.join("out");
 
     check!(File::create(&out));
-    match fs::copy(&*out, tmpdir.path()) {
-        Ok(..) => panic!(),
-        Err(..) => {}
-    }
+    assert!(fs::copy(&*out, tmpdir.path()).is_err());
 }
 
 #[test]
@@ -797,10 +788,7 @@ fn copy_file_src_dir() {
     let tmpdir = tmpdir();
     let out = tmpdir.join("out");
 
-    match fs::copy(tmpdir.path(), &out) {
-        Ok(..) => panic!(),
-        Err(..) => {}
-    }
+    assert!(fs::copy(tmpdir.path(), &out).is_err());
     assert!(!out.exists());
 }
 
@@ -886,6 +874,7 @@ fn symlinks_work() {
 }
 
 #[test]
+#[cfg_attr(target_os = "emscripten", ignore)] // read_link broken on Emscripten (always gives absolute path)
 fn symlink_noexist() {
     // Symlinks can point to things that don't exist
     let tmpdir = tmpdir();
@@ -900,6 +889,7 @@ fn symlink_noexist() {
 }
 
 #[test]
+#[cfg_attr(target_os = "emscripten", ignore)] // read_link broken on Emscripten (always gives absolute path)
 fn read_link() {
     if cfg!(windows) {
         // directory symlink
@@ -928,13 +918,11 @@ fn read_link() {
 #[test]
 fn readlink_not_symlink() {
     let tmpdir = tmpdir();
-    match fs::read_link(tmpdir.path()) {
-        Ok(..) => panic!("wanted a failure"),
-        Err(..) => {}
-    }
+    assert!(fs::read_link(tmpdir.path()).is_err());
 }
 
 #[test]
+#[cfg_attr(target_os = "emscripten", ignore)] // hard links currently broken on Emscripten
 fn links_work() {
     let tmpdir = tmpdir();
     let input = tmpdir.join("in.txt");
@@ -947,17 +935,10 @@ fn links_work() {
     let mut v = Vec::new();
     check!(check!(File::open(&out)).read_to_end(&mut v));
     assert_eq!(v, b"foobar".to_vec());
-
     // can't link to yourself
-    match fs::hard_link(&input, &input) {
-        Ok(..) => panic!("wanted a failure"),
-        Err(..) => {}
-    }
+    assert!(fs::hard_link(&input, &input).is_err());
     // can't link to something that doesn't exist
-    match fs::hard_link(&tmpdir.join("foo"), &tmpdir.join("bar")) {
-        Ok(..) => panic!("wanted a failure"),
-        Err(..) => {}
-    }
+    assert!(fs::hard_link(&tmpdir.join("foo"), &tmpdir.join("bar")).is_err());
 }
 
 #[test]
@@ -974,10 +955,7 @@ fn chmod_works() {
     let attr = check!(fs::metadata(&file));
     assert!(attr.permissions().readonly());
 
-    match fs::set_permissions(&tmpdir.join("foo"), p.clone()) {
-        Ok(..) => panic!("wanted an error"),
-        Err(..) => {}
-    }
+    assert!(fs::set_permissions(&tmpdir.join("foo"), p.clone()).is_err());
 
     p.set_readonly(false);
     check!(fs::set_permissions(&file, p));
@@ -1215,6 +1193,7 @@ fn write_then_read() {
 }
 
 #[test]
+#[cfg_attr(target_os = "emscripten", ignore)] // https://github.com/emscripten-core/emscripten/issues/4017
 fn file_try_clone() {
     let tmpdir = tmpdir();
 
@@ -1431,6 +1410,7 @@ fn metadata_access_times() {
 
 /// Test creating hard links to symlinks.
 #[test]
+#[cfg_attr(target_os = "emscripten", ignore)] // hard links broken on Emscripten
 fn symlink_hard_link() {
     let tmpdir = tmpdir();
     if !got_symlink_permission(&tmpdir) {

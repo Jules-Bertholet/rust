@@ -3,6 +3,7 @@
 // run-fail
 // exec-env:RUST_BACKTRACE=0
 // check-run-results
+// ignore-emscripten no threads
 // needs-unwind
 
 use std::sync::Once;

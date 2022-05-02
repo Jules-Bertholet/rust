@@ -484,7 +484,7 @@ fn dont_panic_in_drop_on_panicked_flush() {
 }
 
 #[test]
-#[cfg_attr(target_os = "emscripten", ignore)]
+#[cfg_attr(target_os = "emscripten", ignore)] // no threads
 fn panic_in_write_doesnt_flush_in_drop() {
     static WRITES: AtomicUsize = AtomicUsize::new(0);
 
