@@ -1404,6 +1404,7 @@ symbols! {
         start,
         state,
         static_in_const,
+        static_in_pattern,
         static_nobundle,
         static_recursion,
         staticlib,

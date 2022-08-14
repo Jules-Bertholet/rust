@@ -39,9 +39,16 @@ pub fn search_for_structural_match_violation<'tcx>(
     span: Span,
     tcx: TyCtxt<'tcx>,
     ty: Ty<'tcx>,
+    strict_pattern_deny: bool,
 ) -> Option<Ty<'tcx>> {
-    ty.visit_with(&mut Search { tcx, span, seen: FxHashSet::default(), adt_const_param: false })
-        .break_value()
+    ty.visit_with(&mut Search {
+        tcx,
+        span,
+        seen: FxHashSet::default(),
+        strict_pattern_deny,
+        adt_const_param: false,
+    })
+    .break_value()
 }
 
 /// This method traverses the structure of `ty`, trying to find any
@@ -56,8 +63,14 @@ pub fn search_for_adt_const_param_violation<'tcx>(
     tcx: TyCtxt<'tcx>,
     ty: Ty<'tcx>,
 ) -> Option<Ty<'tcx>> {
-    ty.visit_with(&mut Search { tcx, span, seen: FxHashSet::default(), adt_const_param: true })
-        .break_value()
+    ty.visit_with(&mut Search {
+        tcx,
+        span,
+        seen: FxHashSet::default(),
+        strict_pattern_deny: false,
+        adt_const_param: true,
+    })
+    .break_value()
 }
 
 /// This method returns true if and only if `adt_ty` itself has been marked as
@@ -118,6 +131,12 @@ struct Search<'tcx> {
     /// Tracks ADTs previously encountered during search, so that
     /// we will not recur on them again.
     seen: FxHashSet<hir::def_id::DefId>,
+
+    // Additionally deny things that currently give warnings in most
+    // patterns due to backward compatibility, but which are hard
+    // errors in patterns involving statics (where backward compatibility
+    // is not a concern).
+    strict_pattern_deny: bool,
 
     // Additionally deny things that have been allowed in patterns,
     // but are not allowed in adt const params, such as floats and
@@ -210,7 +229,7 @@ impl<'tcx> TypeVisitor<'tcx> for Search<'tcx> {
             }
 
             ty::Float(_) => {
-                if !self.adt_const_param {
+                if !(self.adt_const_param || self.strict_pattern_deny) {
                     return ControlFlow::CONTINUE;
                 } else {
                     return ControlFlow::Break(ty);
@@ -235,6 +254,10 @@ impl<'tcx> TypeVisitor<'tcx> for Search<'tcx> {
         if !self.seen.insert(adt_def.did()) {
             debug!("Search already seen adt_def: {:?}", adt_def);
             return ControlFlow::CONTINUE;
+        }
+
+        if adt_def.is_union() {
+            return ControlFlow::Break(ty);
         }
 
         if !self.type_marked_structural(ty) {

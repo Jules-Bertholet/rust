@@ -656,7 +656,7 @@ pub(super) enum Constructor<'tcx> {
     Str(mir::ConstantKind<'tcx>),
     /// Array and slice patterns.
     Slice(Slice),
-    /// Constants that must not be matched structurally. They are treated as black
+    /// Constants and statics that must not be matched structurally. They are treated as black
     /// boxes for the purposes of exhaustiveness: we must not inspect them, and they
     /// don't count towards making a match exhaustive.
     Opaque,
@@ -1405,6 +1405,10 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
                         }
                     }
                 }
+            }
+            PatKind::Static { .. } => {
+                ctor = Opaque;
+                fields = Fields::empty();
             }
             &PatKind::Range(box PatRange { lo, hi, end }) => {
                 let ty = lo.ty();

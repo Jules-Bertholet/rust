@@ -897,7 +897,7 @@ fn report_unexpected_variant_res(tcx: TyCtxt<'_>, res: Res, qpath: &hir::QPath<'
         tcx.sess,
         span,
         E0533,
-        "expected unit struct, unit variant or constant, found {} `{}`",
+        "expected unit struct, unit variant, constant, or static, found {} `{}`",
         res.descr(),
         rustc_hir_pretty::qpath_to_string(qpath),
     )

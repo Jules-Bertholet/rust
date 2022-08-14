@@ -21,7 +21,7 @@ use rustc_session::lint::builtin::{
 };
 use rustc_session::Session;
 use rustc_span::source_map::Spanned;
-use rustc_span::{BytePos, Span};
+use rustc_span::{sym, BytePos, Span};
 
 pub(crate) fn check_match(tcx: TyCtxt<'_>, def_id: DefId) {
     let body_id = match def_id.as_local() {
@@ -103,14 +103,32 @@ impl PatCtxt<'_, '_> {
     fn report_inlining_errors(&self) {
         for error in &self.errors {
             match *error {
-                PatternError::StaticInPattern(span) => {
-                    self.span_e0158(span, "statics cannot be referenced in patterns")
-                }
                 PatternError::AssocConstInPattern(span) => {
                     self.span_e0158(span, "associated consts cannot be referenced in patterns")
                 }
                 PatternError::ConstParamInPattern(span) => {
                     self.span_e0158(span, "const parameters cannot be referenced in patterns")
+                }
+                PatternError::StaticMutInPattern(span) => {
+                    self.span_e0158(span, "mutable statics cannot be referenced in patterns")
+                }
+                PatternError::ThreadLocalStaticInPattern(span) => self
+                    .span_e0158(span, "`#[thread_local]` statics cannot be referenced in patterns"),
+                PatternError::ExternStaticInPattern(span) => self.span_e0158(
+                    span,
+                    "statics from `extern` blocks cannot be referenced in patterns",
+                ),
+                PatternError::StaticInPatternWithoutFeatureGate(span) => {
+                    rustc_session::parse::feature_err(
+                        &self.tcx.sess.parse_sess,
+                        sym::static_in_pattern,
+                        span,
+                        "referencing statics in patterns is experimental",
+                    )
+                    .emit();
+                }
+                PatternError::NonStructuralEqStaticInPattern(span, ref msg) => {
+                    self.tcx.sess.span_err(span, msg);
                 }
                 PatternError::NonConstPath(span) => {
                     rustc_middle::mir::interpret::struct_error(

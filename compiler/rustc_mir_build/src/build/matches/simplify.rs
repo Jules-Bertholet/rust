@@ -203,7 +203,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 Ok(())
             }
 
-            PatKind::Constant { .. } => {
+            PatKind::Constant { .. } | PatKind::Static { .. } => {
                 // FIXME normalize patterns when possible
                 Err(match_pair)
             }

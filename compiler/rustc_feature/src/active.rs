@@ -499,6 +499,8 @@ declare_features! (
     (active, simd_ffi, "1.0.0", Some(27731), None),
     /// Allows specialization of implementations (RFC 1210).
     (incomplete, specialization, "1.7.0", Some(31844), None),
+    /// Allows use of safe statics in patterns.
+    (active, static_in_pattern, "CURRENT_RUSTC_VERSION", None, None),
     /// Allows attributes on expressions and non-item statements.
     (active, stmt_expr_attributes, "1.6.0", Some(15701), None),
     /// Allows lints part of the strict provenance effort.

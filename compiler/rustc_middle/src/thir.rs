@@ -655,6 +655,12 @@ pub enum PatKind<'tcx> {
         value: mir::ConstantKind<'tcx>,
     },
 
+    /// A pattern that refers to a static.
+    Static {
+        alloc_id: AllocId,
+        def_id: DefId,
+    },
+
     Range(Box<PatRange<'tcx>>),
 
     /// Matches against a slice, checking the length and extracting elements.
@@ -810,6 +816,7 @@ impl<'tcx> fmt::Display for Pat<'tcx> {
                 write!(f, "{}", subpattern)
             }
             PatKind::Constant { value } => write!(f, "{}", value),
+            PatKind::Static { alloc_id, .. } => write!(f, "static_ref {alloc_id:?}"),
             PatKind::Range(box PatRange { lo, hi, end }) => {
                 write!(f, "{}", lo)?;
                 write!(f, "{}", end)?;

@@ -219,6 +219,7 @@ impl<'a, 'tcx> Visitor<'a, 'tcx> for UnsafetyVisitor<'a, 'tcx> {
                 PatKind::Binding { .. }
                 // match is conditional on having this value
                 | PatKind::Constant { .. }
+                | PatKind::Static { .. }
                 | PatKind::Variant { .. }
                 | PatKind::Leaf { .. }
                 | PatKind::Deref { .. }

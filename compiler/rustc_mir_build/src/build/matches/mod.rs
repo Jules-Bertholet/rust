@@ -15,12 +15,12 @@ use rustc_data_structures::{
     stack::ensure_sufficient_stack,
 };
 use rustc_index::bit_set::BitSet;
-use rustc_middle::middle::region;
 use rustc_middle::mir::*;
 use rustc_middle::thir::{self, *};
 use rustc_middle::ty::{self, CanonicalUserTypeAnnotation, Ty};
+use rustc_middle::{middle::region, mir::interpret::AllocId};
 use rustc_span::symbol::Symbol;
-use rustc_span::{BytePos, Pos, Span};
+use rustc_span::{def_id::DefId, BytePos, Pos, Span};
 use rustc_target::abi::VariantIdx;
 use smallvec::{smallvec, SmallVec};
 
@@ -777,7 +777,10 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 }
             }
 
-            PatKind::Constant { .. } | PatKind::Range { .. } | PatKind::Wild => {}
+            PatKind::Constant { .. }
+            | PatKind::Static { .. }
+            | PatKind::Range { .. }
+            | PatKind::Wild => {}
 
             PatKind::Deref { ref subpattern } => {
                 self.visit_primary_bindings(subpattern, pattern_user_ty.deref(), f);
@@ -975,6 +978,10 @@ enum TestKind<'tcx> {
         // `&[T]`, `f32` or `f64`.
         ty: Ty<'tcx>,
     },
+
+    /// Test for equality with static, possibly after an unsizing coercion to
+    /// `ty`,
+    StaticEq { alloc_id: AllocId, def_id: DefId, ty: Ty<'tcx> },
 
     /// Test whether the value falls within an inclusive or exclusive range
     Range(Box<PatRange<'tcx>>),

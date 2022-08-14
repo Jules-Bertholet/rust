@@ -290,7 +290,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 // These constants can be of a reference type, e.g. `const X: &u8 = &0;`.
                 // Peeling the reference types too early will cause type checking failures.
                 // Although it would be possible to *also* peel the types of the constants too.
-                Res::Def(DefKind::Const | DefKind::AssocConst, _) => AdjustMode::Pass,
+                Res::Def(DefKind::Const | DefKind::AssocConst | DefKind::Static(_), _) => AdjustMode::Pass,
                 // In the `ValueNS`, we have `SelfCtor(..) | Ctor(_, Const), _)` remaining which
                 // could successfully compile. The former being `Self` requires a unit struct.
                 // In either case, and unlike constants, the pattern itself cannot be
@@ -853,7 +853,8 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
                 DefKind::Ctor(_, CtorKind::Const)
                 | DefKind::Const
                 | DefKind::AssocConst
-                | DefKind::ConstParam,
+                | DefKind::ConstParam
+                | DefKind::Static(_),
                 _,
             ) => {} // OK
             _ => bug!("unexpected pattern resolution: {:?}", res),

@@ -1,0 +1,19 @@
+error[E0658]: referencing statics in patterns is experimental
+  --> $DIR/feature-gate-static_in_pattern.rs:5:9
+   |
+LL |         ZERO => true,
+   |         ^^^^
+   |
+   = help: add `#![feature(static_in_pattern)]` to the crate attributes to enable
+
+error[E0658]: referencing statics in patterns is experimental
+  --> $DIR/feature-gate-static_in_pattern.rs:5:9
+   |
+LL |         ZERO => true,
+   |         ^^^^
+   |
+   = help: add `#![feature(static_in_pattern)]` to the crate attributes to enable
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0658`.

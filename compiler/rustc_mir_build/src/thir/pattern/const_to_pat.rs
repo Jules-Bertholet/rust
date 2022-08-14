@@ -3,13 +3,12 @@ use rustc_index::vec::Idx;
 use rustc_infer::infer::{InferCtxt, TyCtxtInferExt};
 use rustc_middle::mir::{self, Field};
 use rustc_middle::thir::{FieldPat, Pat, PatKind};
-use rustc_middle::ty::print::with_no_trimmed_paths;
 use rustc_middle::ty::{self, AdtDef, Ty, TyCtxt};
 use rustc_session::lint;
 use rustc_span::Span;
 use rustc_trait_selection::traits::predicate_for_trait_def;
 use rustc_trait_selection::traits::query::evaluate_obligation::InferCtxtExt;
-use rustc_trait_selection::traits::{self, ObligationCause, PredicateObligation};
+use rustc_trait_selection::traits::{ObligationCause, PredicateObligation};
 
 use std::cell::Cell;
 
@@ -108,44 +107,11 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
     }
 
     fn adt_derive_msg(&self, adt_def: AdtDef<'tcx>) -> String {
-        let path = self.tcx().def_path_str(adt_def.did());
-        format!(
-            "to use a constant of type `{}` in a pattern, \
-            `{}` must be annotated with `#[derive(PartialEq, Eq)]`",
-            path, path,
-        )
+        super::adt_derive_msg(self.tcx(), adt_def)
     }
 
     fn search_for_structural_match_violation(&self, ty: Ty<'tcx>) -> Option<String> {
-        traits::search_for_structural_match_violation(self.span, self.tcx(), ty).map(|non_sm_ty| {
-            with_no_trimmed_paths!(match non_sm_ty.kind() {
-                ty::Adt(adt, _) => self.adt_derive_msg(*adt),
-                ty::Dynamic(..) => {
-                    "trait objects cannot be used in patterns".to_string()
-                }
-                ty::Opaque(..) => {
-                    "opaque types cannot be used in patterns".to_string()
-                }
-                ty::Closure(..) => {
-                    "closures cannot be used in patterns".to_string()
-                }
-                ty::Generator(..) | ty::GeneratorWitness(..) => {
-                    "generators cannot be used in patterns".to_string()
-                }
-                ty::Float(..) => {
-                    "floating-point numbers cannot be used in patterns".to_string()
-                }
-                ty::FnPtr(..) => {
-                    "function pointers cannot be used in patterns".to_string()
-                }
-                ty::RawPtr(..) => {
-                    "raw pointers cannot be used in patterns".to_string()
-                }
-                _ => {
-                    bug!("use of a value of `{non_sm_ty}` inside a pattern")
-                }
-            })
-        })
+        super::search_for_structural_match_violation(self.span, self.tcx(), ty, false)
     }
 
     fn type_marked_structural(&self, ty: Ty<'tcx>) -> bool {
@@ -342,7 +308,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                         span,
                         |lint| {
                             let msg = format!(
-                                "to use a constant of type `{}` in a pattern, \
+                                "to use a constant or static of type `{}` in a pattern, \
                                  `{}` must be annotated with `#[derive(PartialEq, Eq)]`",
                                 cv.ty(),
                                 cv.ty(),
@@ -364,7 +330,7 @@ impl<'a, 'tcx> ConstToPat<'a, 'tcx> {
                 );
                 let path = tcx.def_path_str(adt_def.did());
                 let msg = format!(
-                    "to use a constant of type `{}` in a pattern, \
+                    "to use a constant or static of type `{}` in a pattern, \
                      `{}` must be annotated with `#[derive(PartialEq, Eq)]`",
                     path, path,
                 );

@@ -21,10 +21,12 @@ use rustc_middle::mir::interpret::{
 use rustc_middle::mir::{self, UserTypeProjection};
 use rustc_middle::mir::{BorrowKind, Field, Mutability};
 use rustc_middle::thir::{Ascription, BindingMode, FieldPat, LocalVarId, Pat, PatKind, PatRange};
+use rustc_middle::ty::print::with_no_trimmed_paths;
 use rustc_middle::ty::subst::{GenericArg, SubstsRef};
 use rustc_middle::ty::CanonicalUserTypeAnnotation;
 use rustc_middle::ty::{self, AdtDef, ConstKind, DefIdTree, Region, Ty, TyCtxt, UserType};
 use rustc_span::{Span, Symbol};
+use rustc_trait_selection::traits;
 
 use std::cmp::Ordering;
 
@@ -32,7 +34,11 @@ use std::cmp::Ordering;
 enum PatternError {
     AssocConstInPattern(Span),
     ConstParamInPattern(Span),
-    StaticInPattern(Span),
+    StaticMutInPattern(Span),
+    ThreadLocalStaticInPattern(Span),
+    ExternStaticInPattern(Span),
+    StaticInPatternWithoutFeatureGate(Span),
+    NonStructuralEqStaticInPattern(Span, String),
     NonConstPath(Span),
 }
 
@@ -437,7 +443,9 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
             _ => {
                 let pattern_error = match res {
                     Res::Def(DefKind::ConstParam, _) => PatternError::ConstParamInPattern(span),
-                    Res::Def(DefKind::Static(_), _) => PatternError::StaticInPattern(span),
+                    Res::Def(DefKind::Static(Mutability::Mut), _) => {
+                        PatternError::StaticMutInPattern(span)
+                    }
                     _ => PatternError::NonConstPath(span),
                 };
                 self.errors.push(pattern_error);
@@ -474,6 +482,32 @@ impl<'a, 'tcx> PatCtxt<'a, 'tcx> {
         let (def_id, is_associated_const) = match res {
             Res::Def(DefKind::Const, def_id) => (def_id, false),
             Res::Def(DefKind::AssocConst, def_id) => (def_id, true),
+            Res::Def(DefKind::Static(Mutability::Not), def_id) => {
+                if self.tcx.is_thread_local_static(def_id) {
+                    self.errors.push(PatternError::ThreadLocalStaticInPattern(span));
+                    return pat_from_kind(PatKind::Wild);
+                }
+
+                if self.tcx.is_foreign_item(def_id) {
+                    self.errors.push(PatternError::ExternStaticInPattern(span));
+                    return pat_from_kind(PatKind::Wild);
+                }
+
+                if let Some(msg) = search_for_structural_match_violation(span, self.tcx, ty, true) {
+                    self.errors.push(PatternError::NonStructuralEqStaticInPattern(span, msg));
+                    return pat_from_kind(PatKind::Wild);
+                }
+
+                if !self.tcx.features().static_in_pattern {
+                    self.errors.push(PatternError::StaticInPatternWithoutFeatureGate(span));
+                    return pat_from_kind(PatKind::Wild);
+                }
+
+                return pat_from_kind(PatKind::Static {
+                    alloc_id: self.tcx.create_static_alloc(def_id),
+                    def_id,
+                });
+            }
 
             _ => return pat_from_kind(self.lower_variant_or_leaf(res, id, span, ty, vec![])),
         };
@@ -750,6 +784,7 @@ impl<'tcx> PatternFoldable<'tcx> for PatKind<'tcx> {
                 PatKind::Deref { subpattern: subpattern.fold_with(folder) }
             }
             PatKind::Constant { value } => PatKind::Constant { value },
+            PatKind::Static { alloc_id, def_id } => PatKind::Static { alloc_id, def_id },
             PatKind::Range(ref range) => PatKind::Range(range.clone()),
             PatKind::Slice { ref prefix, ref slice, ref suffix } => PatKind::Slice {
                 prefix: prefix.fold_with(folder),
@@ -816,5 +851,55 @@ pub(crate) fn compare_const_vals<'tcx>(
             Some((a as i128).cmp(&(b as i128)))
         }
         _ => Some(a.cmp(&b)),
+    }
+}
+
+fn search_for_structural_match_violation<'tcx>(
+    span: Span,
+    tcx: TyCtxt<'tcx>,
+    ty: Ty<'tcx>,
+    strict: bool,
+) -> Option<String> {
+    traits::search_for_structural_match_violation(span, tcx, ty, strict).map(|non_sm_ty| {
+        with_no_trimmed_paths!(match non_sm_ty.kind() {
+            ty::Adt(adt, _) => adt_derive_msg(tcx, *adt),
+            ty::Dynamic(..) => {
+                "trait objects cannot be used in patterns".to_string()
+            }
+            ty::Opaque(..) => {
+                "opaque types cannot be used in patterns".to_string()
+            }
+            ty::Closure(..) => {
+                "closures cannot be used in patterns".to_string()
+            }
+            ty::Generator(..) | ty::GeneratorWitness(..) => {
+                "generators cannot be used in patterns".to_string()
+            }
+            ty::Float(..) => {
+                "floating-point numbers cannot be used in patterns".to_string()
+            }
+            ty::FnPtr(..) => {
+                "function pointers cannot be used in patterns".to_string()
+            }
+            ty::RawPtr(..) => {
+                "raw pointers cannot be used in patterns".to_string()
+            }
+            _ => {
+                bug!("use of a value of `{non_sm_ty}` inside a pattern")
+            }
+        })
+    })
+}
+
+fn adt_derive_msg<'tcx>(tcx: TyCtxt<'tcx>, adt_def: AdtDef<'tcx>) -> String {
+    if adt_def.is_union() {
+        "cannot reference unions in constant or static patterns".to_string()
+    } else {
+        let path = tcx.def_path_str(adt_def.did());
+        format!(
+            "to use a constant or static of type `{}` in a pattern, \
+            `{}` must be annotated with `#[derive(PartialEq, Eq)]`",
+            path, path,
+        )
     }
 }

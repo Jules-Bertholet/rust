@@ -58,6 +58,11 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 kind: TestKind::Eq { value, ty: match_pair.pattern.ty },
             },
 
+            PatKind::Static { alloc_id, def_id } => Test {
+                span: match_pair.pattern.span,
+                kind: TestKind::StaticEq { alloc_id, def_id, ty: match_pair.pattern.ty },
+            },
+
             PatKind::Range(ref range) => {
                 assert_eq!(range.lo.ty(), match_pair.pattern.ty);
                 assert_eq!(range.hi.ty(), match_pair.pattern.ty);
@@ -113,7 +118,8 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
             | PatKind::Binding { .. }
             | PatKind::AscribeUserType { .. }
             | PatKind::Leaf { .. }
-            | PatKind::Deref { .. } => {
+            | PatKind::Deref { .. }
+            | PatKind::Static { .. } => {
                 // don't know how to add these patterns to a switch
                 false
             }
@@ -263,6 +269,71 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 } else if let [success, fail] = *make_target_blocks(self) {
                     assert_eq!(value.ty(), ty);
                     let expect = self.literal_operand(test.span, value);
+                    let val = Operand::Copy(place);
+                    self.compare(block, success, fail, source_info, BinOp::Eq, expect, val);
+                } else {
+                    bug!("`TestKind::Eq` should have two target blocks");
+                }
+            }
+
+            TestKind::StaticEq { alloc_id, def_id, ty } => {
+                let ref_ty = self.tcx.static_ptr_ty(def_id);
+                let mut static_ref_local_decl = LocalDecl::new(ref_ty, test.span);
+                static_ref_local_decl.internal = true;
+                static_ref_local_decl.local_info =
+                    Some(Box::new(LocalInfo::StaticRef { def_id, is_thread_local: false }));
+                let static_ref_temp_local = self.local_decls.push(static_ref_local_decl);
+                let static_ref_temp_place = Place::from(static_ref_temp_local);
+                //this.schedule_drop(span, self.local_scope(), static_ref_temp_place, DropKind::Storage);
+                let static_ref_literal = ConstantKind::Val(
+                    interpret::ConstValue::Scalar(interpret::Scalar::from_pointer(
+                        alloc_id.into(),
+                        &self.tcx,
+                    )),
+                    ref_ty,
+                );
+                let static_ref_const =
+                    Constant { span: test.span, user_ty: None, literal: static_ref_literal };
+
+                if !ty.is_scalar() {
+                    let scrutinee_ref_temp = self.temp(
+                        self.tcx.mk_imm_ref(self.tcx.lifetimes.re_erased, ty),
+                        source_info.span,
+                    );
+                    let scrutinee_ref_rvalue =
+                        Rvalue::Ref(self.tcx.lifetimes.re_erased, BorrowKind::Shared, place);
+                    self.cfg.push_assign(
+                        block,
+                        source_info,
+                        scrutinee_ref_temp,
+                        scrutinee_ref_rvalue,
+                    );
+                    self.non_scalar_compare(
+                        block,
+                        make_target_blocks,
+                        source_info,
+                        static_ref_literal,
+                        scrutinee_ref_temp,
+                        ref_ty,
+                    );
+                } else if let [success, fail] = *make_target_blocks(self) {
+                    let static_ref_rvalue =
+                        Rvalue::Use(Operand::Constant(Box::new(static_ref_const)));
+                    self.cfg.push_assign(
+                        block,
+                        source_info,
+                        static_ref_temp_place,
+                        static_ref_rvalue,
+                    );
+
+                    let static_deref_place = PlaceBuilder::from(static_ref_temp_local)
+                        .deref()
+                        .into_place(self.tcx, &self.upvars);
+                    let static_deref_rvalue =
+                        Rvalue::Use(self.consume_by_copy_or_move(static_deref_place));
+                    let static_dest = self.temp(ty, test.span);
+                    self.cfg.push_assign(block, source_info, static_dest, static_deref_rvalue);
+                    let expect = Operand::Move(static_dest);
                     let val = Operand::Copy(place);
                     self.compare(block, success, fail, source_info, BinOp::Eq, expect, val);
                 } else {
@@ -668,7 +739,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
 
             (&TestKind::Range { .. }, _) => None,
 
-            (&TestKind::Eq { .. } | &TestKind::Len { .. }, _) => {
+            (&TestKind::Eq { .. } | &TestKind::StaticEq { .. } | &TestKind::Len { .. }, _) => {
                 // The call to `self.test(&match_pair)` below is not actually used to generate any
                 // MIR. Instead, we just want to compare with `test` (the parameter of the method)
                 // to see if it is the same.
@@ -786,7 +857,10 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
 impl Test<'_> {
     pub(super) fn targets(&self) -> usize {
         match self.kind {
-            TestKind::Eq { .. } | TestKind::Range(_) | TestKind::Len { .. } => 2,
+            TestKind::Eq { .. }
+            | TestKind::StaticEq { .. }
+            | TestKind::Range(_)
+            | TestKind::Len { .. } => 2,
             TestKind::Switch { adt_def, .. } => {
                 // While the switch that we generate doesn't test for all
                 // variants, we have a target for each variant and the
