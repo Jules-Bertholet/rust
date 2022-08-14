@@ -712,6 +712,12 @@ changelog-seen = 2
 # The full path to the musl libdir.
 #musl-libdir = musl-root/lib
 
+# The root location of the cosmopolitan installation directory. Note
+# that this option only makes sense for the `cosmopolitan` target.
+#
+# Has no default.
+#cosmopolitan-root = <platform specific> (path)
+
 # The root location of the `wasm32-wasi` sysroot. Only used for the
 # `wasm32-wasi` target. If you are building wasm32-wasi target, make sure to
 # create a `[target.wasm32-wasi]` section and move this field there.

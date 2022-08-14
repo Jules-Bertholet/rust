@@ -16,15 +16,15 @@
 //! | static-dylib (clang) | crti, crtbeginT        | N/A                    | crtbegin_static  | dllcrt2, crtbegin | -            |
 //! | wasi-reactor-exe     | N/A                    | N/A                    | N/A              | N/A               | crt1-reactor |
 //!
-//! | Post-link CRT objects | glibc         | musl          | bionic         | mingw  | wasi |
-//! |-----------------------|---------------|---------------|----------------|--------|------|
-//! | dynamic-nopic-exe     | crtend, crtn  | crtend, crtn  | crtend_android | crtend | -    |
-//! | dynamic-pic-exe       | crtendS, crtn | crtendS, crtn | crtend_android | crtend | -    |
-//! | static-nopic-exe      | crtend, crtn  | crtend, crtn  | crtend_android | crtend | -    |
-//! | static-pic-exe        | crtendS, crtn | crtendS, crtn | crtend_android | crtend | -    |
-//! | dynamic-dylib         | crtendS, crtn | crtendS, crtn | crtend_so      | crtend | -    |
-//! | static-dylib (gcc)    | crtend, crtn  | crtendS, crtn | crtend_so      | crtend | -    |
-//! | static-dylib (clang)  | crtendS, crtn | N/A           | crtend_so      | crtend | -    |
+//! | Post-link CRT objects | glibc         | musl          | bionic         | mingw  | wasi | cosmopolitan |
+//! |-----------------------|---------------|---------------|----------------|--------|------|--------------|
+//! | dynamic-nopic-exe     | crtend, crtn  | crtend, crtn  | crtend_android | crtend | -    | -            |
+//! | dynamic-pic-exe       | crtendS, crtn | crtendS, crtn | crtend_android | crtend | -    | -            |
+//! | static-nopic-exe      | crtend, crtn  | crtend, crtn  | crtend_android | crtend | -    | crt, ape     |
+//! | static-pic-exe        | crtendS, crtn | crtendS, crtn | crtend_android | crtend | -    | -            |
+//! | dynamic-dylib         | crtendS, crtn | crtendS, crtn | crtend_so      | crtend | -    | -            |
+//! | static-dylib (gcc)    | crtend, crtn  | crtendS, crtn | crtend_so      | crtend | -    | -            |
+//! | static-dylib (clang)  | crtendS, crtn | N/A           | crtend_so      | crtend | -    | -            |
 //!
 //! Use cases for rustc linking the CRT objects explicitly:
 //!     - rustc needs to add its own Rust-specific objects (mingw is the example)
@@ -85,6 +85,20 @@ pub(super) fn post_musl_fallback() -> CrtObjects {
     ])
 }
 
+pub(super) fn post_cosmopolitan() -> CrtObjects {
+    new(&[
+        (LinkOutputKind::DynamicNoPicExe, &["crt.o", "ape.o"]),
+        (LinkOutputKind::DynamicPicExe, &["crt.o", "ape.o"]),
+        (LinkOutputKind::StaticNoPicExe, &["crt.o", "ape.o"]),
+        (LinkOutputKind::StaticPicExe, &["crt.o", "ape.o"]),
+        (LinkOutputKind::DynamicDylib, &["crt.o", "ape.o"]),
+        (LinkOutputKind::StaticDylib, &["crt.o", "ape.o"]),
+    ])
+}
+
+pub(super) fn post_cosmopolitan_fallback() -> CrtObjects {
+    post_cosmopolitan()
+}
 pub(super) fn pre_mingw_fallback() -> CrtObjects {
     new(&[
         (LinkOutputKind::DynamicNoPicExe, &["crt2.o", "rsbegin.o"]),
@@ -130,6 +144,7 @@ pub enum CrtObjectsFallback {
     Musl,
     Mingw,
     Wasm,
+    Cosmopolitan,
 }
 
 impl FromStr for CrtObjectsFallback {
@@ -140,6 +155,7 @@ impl FromStr for CrtObjectsFallback {
             "musl" => CrtObjectsFallback::Musl,
             "mingw" => CrtObjectsFallback::Mingw,
             "wasm" => CrtObjectsFallback::Wasm,
+            "cosmopolitan" => CrtObjectsFallback::Cosmopolitan,
             _ => return Err(()),
         })
     }
@@ -151,6 +167,7 @@ impl ToJson for CrtObjectsFallback {
             CrtObjectsFallback::Musl => "musl",
             CrtObjectsFallback::Mingw => "mingw",
             CrtObjectsFallback::Wasm => "wasm",
+            CrtObjectsFallback::Cosmopolitan => "cosmopolitan",
         }
         .to_json()
     }

@@ -1146,6 +1146,15 @@ impl Build {
         }
     }
 
+    /// Returns the sysroot for the wasi target, if defined
+    fn cosmopolitan_root(&self, target: TargetSelection) -> Option<&Path> {
+        self.config
+            .target_config
+            .get(&target)
+            .and_then(|t| t.cosmopolitan_root.as_ref())
+            .map(|p| &**p)
+    }
+
     /// Returns the "musl root" for this `target`, if defined
     fn musl_root(&self, target: TargetSelection) -> Option<&Path> {
         self.config

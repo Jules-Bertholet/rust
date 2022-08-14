@@ -41,9 +41,7 @@ fn cc2ar(cc: &Path, target: TargetSelection) -> Option<PathBuf> {
         Some(PathBuf::from(ar))
     } else if target.contains("msvc") {
         None
-    } else if target.contains("musl") {
-        Some(PathBuf::from("ar"))
-    } else if target.contains("openbsd") {
+    } else if target.contains("musl") | target.contains("openbsd") {
         Some(PathBuf::from("ar"))
     } else if target.contains("vxworks") {
         Some(PathBuf::from("wr-ar"))
@@ -77,7 +75,7 @@ fn new_cc_build(build: &Build, target: TargetSelection) -> cc::Build {
             if target.contains("msvc") {
                 cfg.static_crt(true);
             }
-            if target.contains("musl") {
+            if target.contains("musl") | target.ends_with("-cosmopolitan") {
                 cfg.static_flag(true);
             }
         }

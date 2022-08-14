@@ -1046,6 +1046,7 @@ supported_targets! {
     ("x86_64-unknown-none", x86_64_unknown_none),
 
     ("mips64-openwrt-linux-musl", mips64_openwrt_linux_musl),
+    ("x86_64-unknown-unknown-cosmopolitan", x86_64_unknown_unknown_cosmopolitan),
 }
 
 /// Cow-Vec-Str: Cow<'static, [Cow<'static, str>]>
@@ -1983,7 +1984,7 @@ impl Target {
                     match s.parse::<CrtObjectsFallback>() {
                         Ok(fallback) => base.$key_name = Some(fallback),
                         _ => return Some(Err(format!("'{}' is not a valid CRT objects fallback. \
-                                                      Use 'musl', 'mingw' or 'wasm'", s))),
+                                                      Use 'musl', 'mingw', 'wasm', or 'cosmopolitan'", s))),
                     }
                     Some(Ok(()))
                 })).unwrap_or(Ok(()))

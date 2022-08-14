@@ -1574,7 +1574,7 @@ fn crt_objects_fallback(sess: &Session, crate_type: CrateType) -> bool {
                 && detect_self_contained_mingw(&sess)
         }
         // FIXME: Figure out cases in which WASM needs to link with a native toolchain.
-        Some(CrtObjectsFallback::Wasm) => true,
+        Some(CrtObjectsFallback::Wasm | CrtObjectsFallback::Cosmopolitan) => true,
         None => false,
     }
 }

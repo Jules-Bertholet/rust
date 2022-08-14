@@ -401,6 +401,7 @@ pub struct Target {
     pub sanitizers: Option<bool>,
     pub profiler: Option<bool>,
     pub crt_static: Option<bool>,
+    pub cosmopolitan_root: Option<PathBuf>,
     pub musl_root: Option<PathBuf>,
     pub musl_libdir: Option<PathBuf>,
     pub wasi_root: Option<PathBuf>,
@@ -740,6 +741,7 @@ define_config! {
         profiler: Option<bool> = "profiler",
         crt_static: Option<bool> = "crt-static",
         musl_root: Option<String> = "musl-root",
+        cosmopolitan_root: Option<String> = "cosmopolitan-root",
         musl_libdir: Option<String> = "musl-libdir",
         wasi_root: Option<String> = "wasi-root",
         qemu_rootfs: Option<String> = "qemu-rootfs",
@@ -1163,6 +1165,7 @@ impl Config {
                 target.ranlib = cfg.ranlib.map(PathBuf::from);
                 target.linker = cfg.linker.map(PathBuf::from);
                 target.crt_static = cfg.crt_static;
+                target.cosmopolitan_root = cfg.cosmopolitan_root.map(PathBuf::from);
                 target.musl_root = cfg.musl_root.map(PathBuf::from);
                 target.musl_libdir = cfg.musl_libdir.map(PathBuf::from);
                 target.wasi_root = cfg.wasi_root.map(PathBuf::from);

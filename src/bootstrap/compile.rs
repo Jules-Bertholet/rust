@@ -285,6 +285,20 @@ fn copy_self_contained_objects(
             builder.copy(&src, &target);
             target_deps.push((target, DependencyType::TargetSelfContained));
         }
+    } else if target.ends_with("-cosmopolitan") {
+        let srcdir = builder.cosmopolitan_root(target).unwrap_or_else(|| {
+            panic!("Target {:?} does not have a \"cosmopolitan-root\" key", target.triple)
+        });
+        for &obj in &["crt.o", "ape.o", "cosmopolitan.a"] {
+            copy_and_stamp(
+                builder,
+                &libdir_self_contained,
+                srcdir,
+                obj,
+                &mut target_deps,
+                DependencyType::TargetSelfContained,
+            );
+        }
     }
 
     target_deps
@@ -357,6 +371,13 @@ pub fn std_cargo(builder: &Builder<'_>, target: TargetSelection, stage: u32, car
         if target.ends_with("-wasi") {
             if let Some(p) = builder.wasi_root(target) {
                 let root = format!("native={}/lib/wasm32-wasi", p.to_str().unwrap());
+                cargo.rustflag("-L").rustflag(&root);
+            }
+        }
+
+        if target.ends_with("-cosmopolitan") {
+            if let Some(p) = builder.cosmopolitan_root(target) {
+                let root = format!("native={}", p.to_str().unwrap());
                 cargo.rustflag("-L").rustflag(&root);
             }
         }
