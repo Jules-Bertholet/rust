@@ -55,9 +55,10 @@ use rustc_hir::{HirId, RangeEnd};
 use rustc_middle::mir::{self, Field};
 use rustc_middle::thir::{FieldPat, Pat, PatKind, PatRange};
 use rustc_middle::ty::layout::IntegerExt;
-use rustc_middle::ty::{self, Ty, TyCtxt, VariantDef};
+use rustc_middle::ty::{self, Ty, TyCtxt, TypeSuperVisitable, TypeVisitor, VariantDef};
 use rustc_middle::{middle::stability::EvalResult, mir::interpret::ConstValue};
 use rustc_session::lint;
+use rustc_span::symbol::sym;
 use rustc_span::{Span, DUMMY_SP};
 use rustc_target::abi::{Integer, Size, VariantIdx};
 
@@ -66,7 +67,7 @@ use std::cell::Cell;
 use std::cmp::{self, max, min, Ordering};
 use std::fmt;
 use std::iter::{once, IntoIterator};
-use std::ops::RangeInclusive;
+use std::ops::{ControlFlow, RangeInclusive};
 
 /// Recursively expand this pattern into its subpatterns. Only useful for or-patterns.
 fn expand_or_pat<'p, 'tcx>(pat: &'p Pat<'tcx>) -> Vec<&'p Pat<'tcx>> {
@@ -656,10 +657,18 @@ pub(super) enum Constructor<'tcx> {
     Str(mir::ConstantKind<'tcx>),
     /// Array and slice patterns.
     Slice(Slice),
-    /// Constants and statics that must not be matched structurally. They are treated as black
+    /// Constants that must not be matched structurally. They are treated as black
     /// boxes for the purposes of exhaustiveness: we must not inspect them, and they
     /// don't count towards making a match exhaustive.
     Opaque,
+    /// Statics. Like [`Constructor::Opaque`], they are treated as black boxes for the purposes of
+    /// exhaustiveness; the compiler does not look into the concrete value of the static to
+    /// determine exhaustiveness. But there is one exception: in cases where the type of the static
+    /// has a single safe value, like `()` or `&[((), ()); 5]`, exhaustiveness/reachability checking
+    /// assumes that the static has that value. ("Single safe value" meaning "all values are structurally
+    /// equal"; for example, two `&()` references may hve different bit values, but will still compare structurally
+    /// equal.)
+    Static,
     /// Fake extra constructor for enums that aren't allowed to be matched exhaustively. Also used
     /// for those types for which we cannot list constructors explicitly, like `f64` and `str`.
     NonExhaustive,
@@ -758,6 +767,7 @@ impl<'tcx> Constructor<'tcx> {
             | IntRange(..)
             | NonExhaustive
             | Opaque
+            | Static
             | Missing { .. }
             | Wildcard => 0,
             Or => bug!("The `Or` constructor doesn't have a fixed arity"),
@@ -820,9 +830,6 @@ impl<'tcx> Constructor<'tcx> {
         match (self, other) {
             // Wildcards cover anything
             (_, Wildcard) => true,
-            // The missing ctors are not covered by anything in the matrix except wildcards.
-            (Missing { .. } | Wildcard, _) => false,
-
             (Single, Single) => true,
             (Variant(self_id), Variant(other_id)) => self_id == other_id,
 
@@ -849,11 +856,17 @@ impl<'tcx> Constructor<'tcx> {
                 self_val == other_val
             }
             (Slice(self_slice), Slice(other_slice)) => self_slice.is_covered_by(*other_slice),
-
-            // We are trying to inspect an opaque constant. Thus we skip the row.
-            (Opaque, _) | (_, Opaque) => false,
             // Only a wildcard pattern can match the special extra constructor.
             (NonExhaustive, _) => false,
+            // We are trying to inspect an opaque constant. Thus we skip the row.
+            (Opaque, _) | (_, Opaque) => false,
+            // Statics are treated as opaque and therefore skipped, unless the type
+            // has a single safe value. In the latter case, the static pattern
+            // is guaranteed to match.
+            // The missing ctors are not covered by anything in the matrix except wildcards.
+            (_, Static) | (Missing { .. } | Wildcard | Static, _) => {
+                has_single_value(pcx.ty, pcx.cx)
+            }
 
             _ => span_bug!(
                 pcx.span,
@@ -891,7 +904,7 @@ impl<'tcx> Constructor<'tcx> {
                 .any(|other| slice.is_covered_by(other)),
             // This constructor is never covered by anything else
             NonExhaustive => false,
-            Str(..) | FloatRange(..) | Opaque | Missing { .. } | Wildcard | Or => {
+            Str(..) | FloatRange(..) | Opaque | Static | Missing { .. } | Wildcard | Or => {
                 span_bug!(pcx.span, "found unexpected ctor in all_ctors: {:?}", self)
             }
         }
@@ -1238,6 +1251,7 @@ impl<'p, 'tcx> Fields<'p, 'tcx> {
             | IntRange(..)
             | NonExhaustive
             | Opaque
+            | Static
             | Missing { .. }
             | Wildcard => Fields::empty(),
             Or => {
@@ -1407,7 +1421,7 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
                 }
             }
             PatKind::Static { .. } => {
-                ctor = Opaque;
+                ctor = Static;
                 fields = Fields::empty();
             }
             &PatKind::Range(box PatRange { lo, hi, end }) => {
@@ -1531,7 +1545,8 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
                 "trying to convert a `Missing` constructor into a `Pat`; this is probably a bug,
                 `Missing` should have been processed in `apply_constructors`"
             ),
-            Opaque | Or => {
+            Static if has_single_value(self.ty, cx) => PatKind::Wild,
+            Opaque | Static | Or => {
                 bug!("can't convert to pattern: {:?}", self)
             }
         };
@@ -1567,8 +1582,12 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
         other_ctor: &Constructor<'tcx>,
     ) -> SmallVec<[&'p DeconstructedPat<'p, 'tcx>; 2]> {
         match (&self.ctor, other_ctor) {
-            (Wildcard, _) => {
+            (Wildcard | Static, _) => {
                 // We return a wildcard for each field of `other_ctor`.
+                // Because `Static` values are treated opaquely for pattern matching,
+                // the only situation in which we know the `Static` covers another pattern
+                // is when the type being matched has a single safe value. So we specialize
+                // with wildcards, because those will match the one value of the type.
                 Fields::wildcards(pcx, other_ctor).iter_patterns().collect()
             }
             (Slice(self_slice), Slice(other_slice))
@@ -1719,6 +1738,58 @@ impl<'p, 'tcx> fmt::Debug for DeconstructedPat<'p, 'tcx> {
             }
             Str(value) => write!(f, "{}", value),
             Opaque => write!(f, "<constant pattern>"),
+            Static => write!(f, "<static pattern>"),
         }
     }
+}
+
+// Type visitor to check if the type visibly has at most a single safe value.
+struct SingleValueVisitor<'a, 'p, 'tcx> {
+    cx: &'a MatchCheckCtxt<'p, 'tcx>,
+}
+
+impl<'a, 'p, 'tcx> TypeVisitor<'tcx> for SingleValueVisitor<'a, 'p, 'tcx> {
+    type BreakTy = ();
+
+    fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
+        match *ty.kind() {
+            ty::Adt(adt_def, substs) => {
+                let adt_did = adt_def.did();
+                let variants = adt_def.variants();
+
+                if variants.len() > 1
+                    || (!adt_did.is_local()
+                        && (self.cx.tcx.has_attr(adt_did, sym::non_exhaustive)
+                            || variants
+                                .iter()
+                                .any(|var| self.cx.tcx.has_attr(var.def_id, sym::non_exhaustive))))
+                    || adt_def
+                        .all_fields()
+                        .any(|field| !field.vis.is_accessible_from(self.cx.module, self.cx.tcx))
+                {
+                    ControlFlow::BREAK
+                } else {
+                    adt_def
+                        .all_fields()
+                        .try_for_each(|field| self.visit_ty(field.ty(self.cx.tcx, substs)))
+                }
+            }
+            ty::Array(elem_ty, len) => {
+                if len.kind().try_to_machine_usize(self.cx.tcx) == Some(0) {
+                    ControlFlow::CONTINUE
+                } else {
+                    self.visit_ty(elem_ty)
+                }
+            }
+            ty::Ref(_, _, _) | ty::Tuple(_) => ty.super_visit_with(self),
+            ty::FnDef(_, _) | ty::Never => ControlFlow::CONTINUE,
+            _ => ControlFlow::BREAK,
+        }
+    }
+}
+
+/// Check if a type has a single safe value, for the purposes of structural equality.
+/// See [`Constructor::Static`] for why this is needed.
+fn has_single_value<'a, 'p, 'tcx>(ty: Ty<'tcx>, cx: &'a MatchCheckCtxt<'p, 'tcx>) -> bool {
+    (SingleValueVisitor { cx }).visit_ty(ty).is_continue()
 }
