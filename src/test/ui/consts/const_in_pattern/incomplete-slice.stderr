@@ -1,4 +1,4 @@
-warning: to use a constant of type `E` in a pattern, `E` must be annotated with `#[derive(PartialEq, Eq)]`
+warning: to use a constant or static of type `E` in a pattern, `E` must be annotated with `#[derive(PartialEq, Eq)]`
   --> $DIR/incomplete-slice.rs:11:9
    |
 LL |         E_SL => {}

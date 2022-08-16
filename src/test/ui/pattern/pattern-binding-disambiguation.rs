@@ -39,7 +39,7 @@ fn main() {
         CONST => {} // OK, `CONST` is a const pattern
     }
     match doesnt_matter {
-        STATIC => {} //~ ERROR match bindings cannot shadow statics
+        STATIC => {} //~ ERROR mismatched types
     }
     match doesnt_matter {
         function => {} // OK, `function` is a fresh binding
@@ -52,6 +52,6 @@ fn main() {
     let TupleVariant = doesnt_matter; //~ ERROR let bindings cannot shadow tuple variants
     let BracedVariant = doesnt_matter; //~ ERROR let bindings cannot shadow struct variants
     let CONST = CONST; // OK, `CONST` is a const pattern
-    let STATIC = doesnt_matter; //~ ERROR let bindings cannot shadow statics
+    let STATIC = doesnt_matter; //~ ERROR mismatched types
     let function = doesnt_matter; // OK, `function` is a fresh binding
 }

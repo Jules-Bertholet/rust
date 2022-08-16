@@ -31,15 +31,6 @@ LL | use E::*;
 LL |         BracedVariant => {}
    |         ^^^^^^^^^^^^^ cannot be named the same as a struct variant
 
-error[E0530]: match bindings cannot shadow statics
-  --> $DIR/pattern-binding-disambiguation.rs:42:9
-   |
-LL | static STATIC: () = ();
-   | ----------------------- the static `STATIC` is defined here
-...
-LL |         STATIC => {}
-   |         ^^^^^^ cannot be named the same as a static
-
 error[E0530]: let bindings cannot shadow tuple structs
   --> $DIR/pattern-binding-disambiguation.rs:49:9
    |
@@ -67,15 +58,35 @@ LL | use E::*;
 LL |     let BracedVariant = doesnt_matter;
    |         ^^^^^^^^^^^^^ cannot be named the same as a struct variant
 
-error[E0530]: let bindings cannot shadow statics
+error[E0308]: mismatched types
+  --> $DIR/pattern-binding-disambiguation.rs:42:9
+   |
+LL | static STATIC: () = ();
+   | ----------------- static defined here
+...
+LL |     match doesnt_matter {
+   |           ------------- this expression has type `{integer}`
+LL |         STATIC => {}
+   |         ^^^^^^
+   |         |
+   |         expected integer, found `()`
+   |         `STATIC` is interpreted as a static, not a new binding
+   |         help: introduce a new binding instead: `other_static`
+
+error[E0308]: mismatched types
   --> $DIR/pattern-binding-disambiguation.rs:55:9
    |
 LL | static STATIC: () = ();
-   | ----------------------- the static `STATIC` is defined here
+   | ----------------- static defined here
 ...
 LL |     let STATIC = doesnt_matter;
-   |         ^^^^^^ cannot be named the same as a static
+   |         ^^^^^^   ------------- this expression has type `{integer}`
+   |         |
+   |         expected integer, found `()`
+   |         `STATIC` is interpreted as a static, not a new binding
+   |         help: introduce a new binding instead: `other_static`
 
 error: aborting due to 8 previous errors
 
-For more information about this error, try `rustc --explain E0530`.
+Some errors have detailed explanations: E0308, E0530.
+For more information about an error, try `rustc --explain E0308`.

@@ -1,11 +1,14 @@
-error[E0530]: match bindings cannot shadow statics
-  --> $DIR/E0530.rs:6:9
+error[E0530]: match bindings cannot shadow tuple variants
+  --> $DIR/E0530.rs:10:9
    |
-LL |     static TEST: i32 = 0;
-   |     --------------------- the static `TEST` is defined here
+LL | use Enum::*;
+   |     ------- the tuple variant `WithField` is imported here
 ...
-LL |         TEST => {}
-   |         ^^^^ cannot be named the same as a static
+LL |         WithField => {}
+   |         ^^^^^^^^^
+   |         |
+   |         cannot be named the same as a tuple variant
+   |         help: try specify the pattern arguments: `WithField(..)`
 
 error: aborting due to previous error
 

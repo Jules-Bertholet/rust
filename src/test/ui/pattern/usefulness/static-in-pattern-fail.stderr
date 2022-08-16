@@ -1,0 +1,27 @@
+error[E0158]: mutable statics cannot be referenced in patterns
+  --> $DIR/static-in-pattern-fail.rs:15:9
+   |
+LL |         ZERO => true,
+   |         ^^^^
+
+error[E0158]: mutable statics cannot be referenced in patterns
+  --> $DIR/static-in-pattern-fail.rs:21:10
+   |
+LL |         (ZERO, 1) => true,
+   |          ^^^^
+
+error: to use a constant or static of type `NoPartialEqEq` in a pattern, `NoPartialEqEq` must be annotated with `#[derive(PartialEq, Eq)]`
+  --> $DIR/static-in-pattern-fail.rs:27:9
+   |
+LL |         WHEE => true,
+   |         ^^^^
+
+error[E0158]: `#[thread_local]` statics cannot be referenced in patterns
+  --> $DIR/static-in-pattern-fail.rs:33:9
+   |
+LL |         TRUE | FALSE => true,
+   |         ^^^^
+
+error: aborting due to 4 previous errors
+
+For more information about this error, try `rustc --explain E0158`.

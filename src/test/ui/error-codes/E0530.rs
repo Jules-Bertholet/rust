@@ -1,8 +1,13 @@
-fn main() {
-    static TEST: i32 = 0;
+enum Enum {
+    WithField(i32)
+}
 
-    let r: (i32, i32) = (0, 0);
-    match r {
-        TEST => {} //~ ERROR E0530
+use Enum::*;
+
+
+fn main() {
+    match WithField(1) {
+        WithField => {}
+        //~^ ERROR E0530
     }
 }

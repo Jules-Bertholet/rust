@@ -8,11 +8,11 @@ fn main() {
     let 0u8..=x = 0;
     //~^ ERROR: runtime values cannot be referenced in patterns
     let 0u8..=FOO = 0;
-    //~^ ERROR: statics cannot be referenced in patterns
+    //~^ ERROR: referencing statics in patterns is experimental
     match 1 {
         0 ..= x => {}
         //~^ ERROR: runtime values cannot be referenced in patterns
         0 ..= FOO => {}
-        //~^ ERROR: statics cannot be referenced in patterns
+        //~^ ERROR: referencing statics in patterns is experimental
     };
 }

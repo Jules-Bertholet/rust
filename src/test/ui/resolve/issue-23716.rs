@@ -1,8 +1,7 @@
 static foo: i32 = 0;
 
 fn bar(foo: i32) {}
-//~^ ERROR function parameters cannot shadow statics
-//~| cannot be named the same as a static
+//~^ ERROR referencing statics in patterns is experimental
 
 mod submod {
     pub static answer: i32 = 42;
@@ -11,7 +10,6 @@ mod submod {
 use self::submod::answer;
 
 fn question(answer: i32) {}
-//~^ ERROR function parameters cannot shadow statics
-//~| cannot be named the same as a static
+//~^ ERROR referencing statics in patterns is experimental
 fn main() {
 }

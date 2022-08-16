@@ -1,9 +1,11 @@
-error[E0532]: expected unit struct, unit variant or constant, found static `self::X`
+error[E0658]: referencing statics in patterns is experimental
   --> $DIR/issue-17933.rs:5:9
    |
 LL |         self::X => { },
-   |         ^^^^^^^ not a unit struct, unit variant or constant
+   |         ^^^^^^^
+   |
+   = help: add `#![feature(static_in_pattern)]` to the crate attributes to enable
 
 error: aborting due to previous error
 
-For more information about this error, try `rustc --explain E0532`.
+For more information about this error, try `rustc --explain E0658`.

@@ -1,10 +1,10 @@
-error[E0533]: expected unit struct, unit variant or constant, found struct variant `Alias::Braced`
+error[E0533]: expected unit struct, unit variant, constant, or static, found struct variant `Alias::Braced`
   --> $DIR/incorrect-variant-form-through-alias-caught.rs:8:5
    |
 LL |     Alias::Braced;
    |     ^^^^^^^^^^^^^
 
-error[E0533]: expected unit struct, unit variant or constant, found struct variant `Alias::Braced`
+error[E0533]: expected unit struct, unit variant, constant, or static, found struct variant `Alias::Braced`
   --> $DIR/incorrect-variant-form-through-alias-caught.rs:10:9
    |
 LL |     let Alias::Braced = panic!();

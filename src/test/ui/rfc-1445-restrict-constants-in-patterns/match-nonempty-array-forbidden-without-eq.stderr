@@ -1,4 +1,4 @@
-error: to use a constant of type `B` in a pattern, `B` must be annotated with `#[derive(PartialEq, Eq)]`
+error: to use a constant or static of type `B` in a pattern, `B` must be annotated with `#[derive(PartialEq, Eq)]`
   --> $DIR/match-nonempty-array-forbidden-without-eq.rs:16:9
    |
 LL |         FOO => { }
