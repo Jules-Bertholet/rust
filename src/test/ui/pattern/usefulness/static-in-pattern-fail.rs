@@ -9,6 +9,11 @@ static ZERO_REF: &&f32 = &&0.0;
 static TRUE: bool = true;
 static FALSE: bool = false;
 static WHEE: NoPartialEqEq = NoPartialEqEq(1, false);
+#[link_name="IN"]
+static OUT: i32 = 3;
+extern "Rust" {
+    static IN: i32;
+}
 
 fn main() {
     let val = match 0 {
@@ -20,6 +25,12 @@ fn main() {
     let val = match (0, 1) {
         (ZERO, 1) => true,
          //~^ ERROR mutable statics cannot be referenced in patterns
+        _ => false,
+    };
+
+    let val = match 0 {
+        IN => true,
+        //~^ ERROR statics from `extern` blocks cannot be referenced in patterns
         _ => false,
     };
 
