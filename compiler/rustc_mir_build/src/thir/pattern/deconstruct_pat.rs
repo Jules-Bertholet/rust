@@ -51,6 +51,7 @@ use super::usefulness::{MatchCheckCtxt, PatCtxt};
 use rustc_data_structures::captures::Captures;
 use rustc_index::vec::Idx;
 
+use rustc_hir::def_id::DefId;
 use rustc_hir::{HirId, RangeEnd};
 use rustc_middle::mir::{self, Field};
 use rustc_middle::thir::{FieldPat, Pat, PatKind, PatRange};
@@ -668,7 +669,7 @@ pub(super) enum Constructor<'tcx> {
     /// assumes that the static has that value. ("Single safe value" meaning "all values are structurally
     /// equal"; for example, two `&()` references may hve different bit values, but will still compare structurally
     /// equal.)
-    Static,
+    Static(DefId),
     /// Fake extra constructor for enums that aren't allowed to be matched exhaustively. Also used
     /// for those types for which we cannot list constructors explicitly, like `f64` and `str`.
     NonExhaustive,
@@ -767,7 +768,7 @@ impl<'tcx> Constructor<'tcx> {
             | IntRange(..)
             | NonExhaustive
             | Opaque
-            | Static
+            | Static(..)
             | Missing { .. }
             | Wildcard => 0,
             Or => bug!("The `Or` constructor doesn't have a fixed arity"),
@@ -862,9 +863,11 @@ impl<'tcx> Constructor<'tcx> {
             (Opaque, _) | (_, Opaque) => false,
             // Statics are treated as opaque and therefore skipped, unless the type
             // has a single safe value. In the latter case, the static pattern
-            // is guaranteed to match.
+            // is guaranteed to match. In addition, two static patterns that
+            // reference the same static are always equivalent.
             // The missing ctors are not covered by anything in the matrix except wildcards.
-            (_, Static) | (Missing { .. } | Wildcard | Static, _) => {
+            (Static(def_id_1), Static(def_id_2)) if def_id_1 == def_id_2 => true,
+            (_, Static(..)) | (Missing { .. } | Wildcard | Static(..), _) => {
                 has_single_value(pcx.ty, pcx.cx)
             }
 
@@ -904,7 +907,7 @@ impl<'tcx> Constructor<'tcx> {
                 .any(|other| slice.is_covered_by(other)),
             // This constructor is never covered by anything else
             NonExhaustive => false,
-            Str(..) | FloatRange(..) | Opaque | Static | Missing { .. } | Wildcard | Or => {
+            Str(..) | FloatRange(..) | Opaque | Static(..) | Missing { .. } | Wildcard | Or => {
                 span_bug!(pcx.span, "found unexpected ctor in all_ctors: {:?}", self)
             }
         }
@@ -1251,7 +1254,7 @@ impl<'p, 'tcx> Fields<'p, 'tcx> {
             | IntRange(..)
             | NonExhaustive
             | Opaque
-            | Static
+            | Static(..)
             | Missing { .. }
             | Wildcard => Fields::empty(),
             Or => {
@@ -1420,8 +1423,8 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
                     }
                 }
             }
-            PatKind::Static { .. } => {
-                ctor = Static;
+            PatKind::Static { def_id, .. } => {
+                ctor = Static(*def_id);
                 fields = Fields::empty();
             }
             &PatKind::Range(box PatRange { lo, hi, end }) => {
@@ -1545,8 +1548,8 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
                 "trying to convert a `Missing` constructor into a `Pat`; this is probably a bug,
                 `Missing` should have been processed in `apply_constructors`"
             ),
-            Static if has_single_value(self.ty, cx) => PatKind::Wild,
-            Opaque | Static | Or => {
+            Static(..) if has_single_value(self.ty, cx) => PatKind::Wild,
+            Opaque | Static(..) | Or => {
                 bug!("can't convert to pattern: {:?}", self)
             }
         };
@@ -1582,7 +1585,7 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
         other_ctor: &Constructor<'tcx>,
     ) -> SmallVec<[&'p DeconstructedPat<'p, 'tcx>; 2]> {
         match (&self.ctor, other_ctor) {
-            (Wildcard | Static, _) => {
+            (Wildcard | Static(..), _) => {
                 // We return a wildcard for each field of `other_ctor`.
                 // Because `Static` values are treated opaquely for pattern matching,
                 // the only situation in which we know the `Static` covers another pattern
@@ -1738,7 +1741,7 @@ impl<'p, 'tcx> fmt::Debug for DeconstructedPat<'p, 'tcx> {
             }
             Str(value) => write!(f, "{}", value),
             Opaque => write!(f, "<constant pattern>"),
-            Static => write!(f, "<static pattern>"),
+            Static(def_id) => write!(f, "<static pattern @ def_id {def_id:?}>"),
         }
     }
 }

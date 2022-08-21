@@ -1,0 +1,14 @@
+error: unreachable pattern
+  --> $DIR/static-in-pattern-repeat.rs:9:9
+   |
+LL |         ZERO => true,
+   |         ^^^^
+   |
+note: the lint level is defined here
+  --> $DIR/static-in-pattern-repeat.rs:2:9
+   |
+LL | #![deny(unreachable_patterns)]
+   |         ^^^^^^^^^^^^^^^^^^^^
+
+error: aborting due to previous error
+
