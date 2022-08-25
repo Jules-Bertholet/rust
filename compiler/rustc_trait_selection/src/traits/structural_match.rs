@@ -199,7 +199,7 @@ impl<'tcx> TypeVisitor<'tcx> for Search<'tcx> {
             }
 
             ty::FnPtr(..) => {
-                if !self.adt_const_param {
+                if !(self.adt_const_param || self.strict_pattern_deny) {
                     return ControlFlow::CONTINUE;
                 } else {
                     return ControlFlow::Break(ty);
