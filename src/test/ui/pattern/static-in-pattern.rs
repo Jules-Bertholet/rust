@@ -151,4 +151,11 @@ fn main() {
         _ => false,
     };
     assert_eq!(val, true);
+
+    let val = match &&0 {
+        ZERO_REF => true,
+        ZERO_REF => false,
+        _ => false,
+    };
+    assert_eq!(val, true);
 }

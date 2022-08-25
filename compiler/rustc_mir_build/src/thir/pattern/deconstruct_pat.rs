@@ -665,8 +665,8 @@ pub(super) enum Constructor<'tcx> {
     /// Statics. Like [`Constructor::Opaque`], they are treated as black boxes for the purposes of
     /// exhaustiveness; the compiler does not look into the concrete value of the static to
     /// determine exhaustiveness. But there is one exception: in cases where the type of the static
-    /// has a single safe value, like `()` or `&[((), ()); 5]`, exhaustiveness/reachability checking
-    /// assumes that the static has that value. ("Single safe value" meaning "all values are structurally
+    /// has a single valid value, like `()` or `&[((), ()); 5]`, exhaustiveness/reachability checking
+    /// assumes that the static has that value. ("Single valid value" meaning "all values are structurally
     /// equal"; for example, two `&()` references may hve different bit values, but will still compare structurally
     /// equal.)
     Static(DefId),
@@ -862,11 +862,16 @@ impl<'tcx> Constructor<'tcx> {
             // We are trying to inspect an opaque constant. Thus we skip the row.
             (Opaque, _) | (_, Opaque) => false,
             // Statics are treated as opaque and therefore skipped, unless the type
-            // has a single safe value. In the latter case, the static pattern
+            // has a single valid value. In the latter case, the static pattern
             // is guaranteed to match. In addition, two static patterns that
-            // reference the same static are always equivalent.
+            // reference the same static are equivalent, unless the type of the static
+            // contains references (in which case the static's value might change).
             // The missing ctors are not covered by anything in the matrix except wildcards.
-            (Static(def_id_1), Static(def_id_2)) if def_id_1 == def_id_2 => true,
+            (Static(def_id_1), Static(def_id_2))
+                if def_id_1 == def_id_2 && contains_no_references(pcx.ty, pcx.cx) =>
+            {
+                true
+            }
             (_, Static(..)) | (Missing { .. } | Wildcard | Static(..), _) => {
                 has_single_value(pcx.ty, pcx.cx)
             }
@@ -1589,7 +1594,7 @@ impl<'p, 'tcx> DeconstructedPat<'p, 'tcx> {
                 // We return a wildcard for each field of `other_ctor`.
                 // Because `Static` values are treated opaquely for pattern matching,
                 // the only situation in which we know the `Static` covers another pattern
-                // is when the type being matched has a single safe value. So we specialize
+                // is when the type being matched has a single valid value. So we specialize
                 // with wildcards, because those will match the one value of the type.
                 Fields::wildcards(pcx, other_ctor).iter_patterns().collect()
             }
@@ -1746,7 +1751,7 @@ impl<'p, 'tcx> fmt::Debug for DeconstructedPat<'p, 'tcx> {
     }
 }
 
-// Type visitor to check if the type visibly has at most a single safe value.
+// Type visitor to check if the type visibly has at most a single valid value.
 struct SingleValueVisitor<'a, 'p, 'tcx> {
     cx: &'a MatchCheckCtxt<'p, 'tcx>,
 }
@@ -1777,6 +1782,7 @@ impl<'a, 'p, 'tcx> TypeVisitor<'tcx> for SingleValueVisitor<'a, 'p, 'tcx> {
                         .try_for_each(|field| self.visit_ty(field.ty(self.cx.tcx, substs)))
                 }
             }
+
             ty::Array(elem_ty, len) => {
                 if len.kind().try_to_machine_usize(self.cx.tcx) == Some(0) {
                     ControlFlow::CONTINUE
@@ -1784,15 +1790,62 @@ impl<'a, 'p, 'tcx> TypeVisitor<'tcx> for SingleValueVisitor<'a, 'p, 'tcx> {
                     self.visit_ty(elem_ty)
                 }
             }
+
             ty::Ref(_, _, _) | ty::Tuple(_) => ty.super_visit_with(self),
+
             ty::FnDef(_, _) | ty::Never => ControlFlow::CONTINUE,
+
             _ => ControlFlow::BREAK,
         }
     }
 }
 
-/// Check if a type has a single safe value, for the purposes of structural equality.
+/// Check if a type has a single valid value, for the purposes of structural equality.
 /// See [`Constructor::Static`] for why this is needed.
 fn has_single_value<'a, 'p, 'tcx>(ty: Ty<'tcx>, cx: &'a MatchCheckCtxt<'p, 'tcx>) -> bool {
     (SingleValueVisitor { cx }).visit_ty(ty).is_continue()
+}
+
+// Type visitor to check if the type contains a reference.
+struct ContainsReferenceVisitor<'a, 'p, 'tcx> {
+    cx: &'a MatchCheckCtxt<'p, 'tcx>,
+}
+
+impl<'a, 'p, 'tcx> TypeVisitor<'tcx> for ContainsReferenceVisitor<'a, 'p, 'tcx> {
+    type BreakTy = ();
+
+    fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
+        match *ty.kind() {
+            ty::Bool
+            | ty::Char
+            | ty::Int(_)
+            | ty::Uint(_)
+            | ty::Float(_)
+            | ty::Str
+            | ty::RawPtr(_)
+            | ty::FnDef(..)
+            | ty::Never => ControlFlow::CONTINUE,
+
+            ty::Adt(adt_def, substs) => adt_def
+                .all_fields()
+                .try_for_each(|field| self.visit_ty(field.ty(self.cx.tcx, substs))),
+
+            ty::Array(elem_ty, len) => {
+                if len.kind().try_to_machine_usize(self.cx.tcx) == Some(0) {
+                    ControlFlow::CONTINUE
+                } else {
+                    self.visit_ty(elem_ty)
+                }
+            }
+
+            ty::Slice(_) | ty::Tuple(_) => ty.super_visit_with(self),
+
+            _ => ControlFlow::BREAK,
+        }
+    }
+}
+
+/// Check if a type contains a reference.
+fn contains_no_references<'a, 'p, 'tcx>(ty: Ty<'tcx>, cx: &'a MatchCheckCtxt<'p, 'tcx>) -> bool {
+    (ContainsReferenceVisitor { cx }).visit_ty(ty).is_continue()
 }
