@@ -48,11 +48,11 @@ use self::SliceKind::*;
 use super::compare_const_vals;
 use super::usefulness::{MatchCheckCtxt, PatCtxt};
 
+use rustc_ast::Mutability;
 use rustc_data_structures::captures::Captures;
-use rustc_index::vec::Idx;
-
 use rustc_hir::def_id::DefId;
 use rustc_hir::{HirId, RangeEnd};
+use rustc_index::vec::Idx;
 use rustc_middle::mir::{self, Field};
 use rustc_middle::thir::{FieldPat, Pat, PatKind, PatRange};
 use rustc_middle::ty::layout::IntegerExt;
@@ -868,7 +868,7 @@ impl<'tcx> Constructor<'tcx> {
             // contains references (in which case the static's value might change).
             // The missing ctors are not covered by anything in the matrix except wildcards.
             (Static(def_id_1), Static(def_id_2))
-                if def_id_1 == def_id_2 && contains_no_references(pcx.ty, pcx.cx) =>
+                if def_id_1 == def_id_2 && contains_no_nested_references(pcx.ty, pcx.cx) =>
             {
                 true
             }
@@ -1806,12 +1806,13 @@ fn has_single_value<'a, 'p, 'tcx>(ty: Ty<'tcx>, cx: &'a MatchCheckCtxt<'p, 'tcx>
     (SingleValueVisitor { cx }).visit_ty(ty).is_continue()
 }
 
-// Type visitor to check if the type contains a reference.
-struct ContainsReferenceVisitor<'a, 'p, 'tcx> {
+// Type visitor to check if the type contains a nested reference.
+struct ContainsNestedReferenceVisitor<'a, 'p, 'tcx> {
+    behind_reference_already: bool,
     cx: &'a MatchCheckCtxt<'p, 'tcx>,
 }
 
-impl<'a, 'p, 'tcx> TypeVisitor<'tcx> for ContainsReferenceVisitor<'a, 'p, 'tcx> {
+impl<'a, 'p, 'tcx> TypeVisitor<'tcx> for ContainsNestedReferenceVisitor<'a, 'p, 'tcx> {
     type BreakTy = ();
 
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> ControlFlow<Self::BreakTy> {
@@ -1840,12 +1841,23 @@ impl<'a, 'p, 'tcx> TypeVisitor<'tcx> for ContainsReferenceVisitor<'a, 'p, 'tcx> 
 
             ty::Slice(_) | ty::Tuple(_) => ty.super_visit_with(self),
 
+            ty::Ref(_, _, Mutability::Not) if !self.behind_reference_already => ty
+                .super_visit_with(&mut ContainsNestedReferenceVisitor {
+                    behind_reference_already: true,
+                    cx: self.cx,
+                }),
+
             _ => ControlFlow::BREAK,
         }
     }
 }
 
-/// Check if a type contains a reference.
-fn contains_no_references<'a, 'p, 'tcx>(ty: Ty<'tcx>, cx: &'a MatchCheckCtxt<'p, 'tcx>) -> bool {
-    (ContainsReferenceVisitor { cx }).visit_ty(ty).is_continue()
+/// Check if a type contains no nested references.
+fn contains_no_nested_references<'a, 'p, 'tcx>(
+    ty: Ty<'tcx>,
+    cx: &'a MatchCheckCtxt<'p, 'tcx>,
+) -> bool {
+    (ContainsNestedReferenceVisitor { behind_reference_already: false, cx })
+        .visit_ty(ty)
+        .is_continue()
 }
