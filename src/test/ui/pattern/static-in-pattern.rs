@@ -46,6 +46,9 @@ static ZST_ENUM: ZstEnum = ZstEnum::Variant();
 static ONE_VALUE: OneValue =
     OneValue::Foo((((),), ()), [&&(); 5], ZstStruct {}, ZstStruct2(()), []);
 
+static mut MUT_INNER: i32 = 5;
+static NESTED_REF: &&i32 = unsafe { &&MUT_INNER };
+
 fn main() {
     let val = match 0 {
         ZERO => true,
@@ -155,6 +158,17 @@ fn main() {
     let val = match &&0 {
         ZERO_REF => true,
         ZERO_REF => false,
+        _ => false,
+    };
+    assert_eq!(val, true);
+
+    let val = match &&0 {
+        NESTED_REF => false,
+        _ if unsafe {
+            **(core::mem::transmute::<_, *mut *mut i32>(NESTED_REF)) = 0;
+            false
+        } => false,
+        NESTED_REF => true,
         _ => false,
     };
     assert_eq!(val, true);
