@@ -37,7 +37,8 @@ fn exitstatus_display_tests() {
 }
 
 #[test]
-#[cfg_attr(target_os = "emscripten", ignore)]
+#[cfg_attr(target_os = "emscripten", ignore)] // no threads
+#[cfg_attr(not(panic = "unwind"), should_panic)]
 fn test_command_fork_no_unwind() {
     let got = catch_unwind(|| {
         let mut c = Command::new("echo");

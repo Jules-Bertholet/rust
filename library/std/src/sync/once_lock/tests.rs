@@ -85,6 +85,7 @@ fn clone() {
 }
 
 #[test]
+#[cfg_attr(not(panic = "unwind"), should_panic)]
 fn get_or_try_init() {
     let cell: OnceLock<String> = OnceLock::new();
     assert!(cell.get().is_none());

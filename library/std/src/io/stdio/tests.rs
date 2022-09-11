@@ -25,7 +25,7 @@ fn stderrlock_unwind_safe() {
 fn assert_unwind_safe<T: UnwindSafe + RefUnwindSafe>() {}
 
 #[test]
-#[cfg_attr(target_os = "emscripten", ignore)]
+#[cfg_attr(target_os = "emscripten", ignore)] // no threads
 fn panic_doesnt_poison() {
     thread::spawn(|| {
         let _a = stdin();
