@@ -170,7 +170,7 @@ impl fmt::Display for Debugger {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PanicStrategy {
     Unwind,
     Abort,
@@ -275,7 +275,7 @@ pub struct Config {
     /// override this setting.
     pub optimize_tests: bool,
 
-    /// What panic strategy the target is built with.  Unwind supports Abort, but
+    /// What panic strategy the target is built with. Unwind supports Abort, but
     /// not vice versa.
     pub target_panic: PanicStrategy,
 
@@ -432,6 +432,13 @@ impl Config {
         ];
         ASM_SUPPORTED_ARCHS.contains(&self.target_cfg().arch.as_str())
     }
+
+    pub fn can_unwind(&self) -> bool {
+        matches!(
+            (self.target_panic, self.target_cfg().panic),
+            (PanicStrategy::Unwind, PanicStrategy::Unwind)
+        )
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -443,9 +450,10 @@ pub struct TargetCfg {
     families: Vec<String>,
     pointer_width: u32,
     endian: Endian,
+    panic: PanicStrategy,
 }
 
-#[derive(Eq, PartialEq, Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Endian {
     Little,
     Big,
@@ -478,6 +486,7 @@ impl TargetCfg {
         let mut families = Vec::new();
         let mut pointer_width = None;
         let mut endian = None;
+        let mut panic = None;
         for line in print_cfg.lines() {
             if let Some((name, value)) = line.split_once('=') {
                 let value = value.trim_matches('"');
@@ -495,6 +504,13 @@ impl TargetCfg {
                             s => panic!("unexpected {s}"),
                         })
                     }
+                    "panic" => {
+                        panic = Some(match value {
+                            "unwind" => PanicStrategy::Unwind,
+                            "abort" => PanicStrategy::Abort,
+                            s => panic!("unexpected {s}"),
+                        })
+                    }
                     _ => {}
                 }
             }
@@ -507,6 +523,7 @@ impl TargetCfg {
             families,
             pointer_width: pointer_width.unwrap(),
             endian: endian.unwrap(),
+            panic: panic.unwrap(),
         }
     }
 }
