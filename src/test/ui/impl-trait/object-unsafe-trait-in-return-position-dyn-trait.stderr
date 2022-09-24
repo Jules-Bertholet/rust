@@ -17,8 +17,8 @@ LL |     fn foo(&self) -> Self;
    |            +++++
 help: alternatively, consider constraining `foo` so it does not apply to trait objects
    |
-LL |     fn foo() -> Self where Self: Sized;
-   |                      +++++++++++++++++
+LL |     fn foo() -> Self where Self: core::marker::Aligned;
+   |                      +++++++++++++++++++++++++++++++++
 
 error[E0038]: the trait `NotObjectSafe` cannot be made into an object
   --> $DIR/object-unsafe-trait-in-return-position-dyn-trait.rs:28:17
@@ -39,8 +39,8 @@ LL |     fn foo(&self) -> Self;
    |            +++++
 help: alternatively, consider constraining `foo` so it does not apply to trait objects
    |
-LL |     fn foo() -> Self where Self: Sized;
-   |                      +++++++++++++++++
+LL |     fn foo() -> Self where Self: core::marker::Aligned;
+   |                      +++++++++++++++++++++++++++++++++
 
 error: aborting due to 2 previous errors
 

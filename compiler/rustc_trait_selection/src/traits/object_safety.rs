@@ -65,13 +65,13 @@ fn object_safety_violations(tcx: TyCtxt<'_>, trait_def_id: DefId) -> &'_ [Object
 
 /// We say a method is *vtable safe* if it can be invoked on a trait
 /// object. Note that object-safe traits can have some
-/// non-vtable-safe methods, so long as they require `Self: Sized` or
+/// non-vtable-safe methods, so long as they require `Self: Aligned` or
 /// otherwise ensure that they cannot be used when `Self = Trait`.
 pub fn is_vtable_safe_method(tcx: TyCtxt<'_>, trait_def_id: DefId, method: &ty::AssocItem) -> bool {
     debug_assert!(tcx.generics_of(trait_def_id).has_self);
     debug!("is_vtable_safe_method({:?}, {:?})", trait_def_id, method);
-    // Any method that has a `Self: Sized` bound cannot be called.
-    if generics_require_sized_self(tcx, method.def_id) {
+    // Any method that has a `Self: Aligned` bound cannot be called.
+    if generics_require_aligned_self(tcx, method.def_id) {
         return false;
     }
 
@@ -110,10 +110,10 @@ fn object_safety_violations_for_trait(
         .collect();
 
     // Check the trait itself.
-    if trait_has_sized_self(tcx, trait_def_id) {
-        // We don't want to include the requirement from `Sized` itself to be `Sized` in the list.
-        let spans = get_sized_bounds(tcx, trait_def_id);
-        violations.push(ObjectSafetyViolation::SizedSelf(spans));
+    if trait_has_aligned_self(tcx, trait_def_id) {
+        // We don't want to include the requirement from `Aligned` itself to be `Aligned` in the list.
+        let spans = get_aligned_bounds(tcx, trait_def_id);
+        violations.push(ObjectSafetyViolation::AlignedSelf(spans));
     }
     let spans = predicates_reference_self(tcx, trait_def_id, false);
     if !spans.is_empty() {
@@ -197,25 +197,25 @@ fn lint_object_unsafe_trait(
     });
 }
 
-fn sized_trait_bound_spans<'tcx>(
+fn aligned_trait_bound_spans<'tcx>(
     tcx: TyCtxt<'tcx>,
     bounds: hir::GenericBounds<'tcx>,
 ) -> impl 'tcx + Iterator<Item = Span> {
     bounds.iter().filter_map(move |b| match b {
         hir::GenericBound::Trait(trait_ref, hir::TraitBoundModifier::None)
-            if trait_has_sized_self(
+            if trait_has_aligned_self(
                 tcx,
                 trait_ref.trait_ref.trait_def_id().unwrap_or_else(|| FatalError.raise()),
             ) =>
         {
-            // Fetch spans for supertraits that are `Sized`: `trait T: Super`
+            // Fetch spans for supertraits that are `Aligned`: `trait T: Super`
             Some(trait_ref.span)
         }
         _ => None,
     })
 }
 
-fn get_sized_bounds(tcx: TyCtxt<'_>, trait_def_id: DefId) -> SmallVec<[Span; 1]> {
+fn get_aligned_bounds(tcx: TyCtxt<'_>, trait_def_id: DefId) -> SmallVec<[Span; 1]> {
     tcx.hir()
         .get_if_local(trait_def_id)
         .and_then(|node| match node {
@@ -231,16 +231,16 @@ fn get_sized_bounds(tcx: TyCtxt<'_>, trait_def_id: DefId) -> SmallVec<[Span; 1]>
                             hir::WherePredicate::BoundPredicate(pred)
                                 if pred.bounded_ty.hir_id.owner.to_def_id() == trait_def_id =>
                             {
-                                // Fetch spans for trait bounds that are Sized:
+                                // Fetch spans for trait bounds that are `Aligned`:
                                 // `trait T where Self: Pred`
-                                Some(sized_trait_bound_spans(tcx, pred.bounds))
+                                Some(aligned_trait_bound_spans(tcx, pred.bounds))
                             }
                             _ => None,
                         }
                     })
                     .flatten()
-                    // Fetch spans for supertraits that are `Sized`: `trait T: Super`.
-                    .chain(sized_trait_bound_spans(tcx, bounds))
+                    // Fetch spans for supertraits that are `Aligned`: `trait T: Super`.
+                    .chain(aligned_trait_bound_spans(tcx, bounds))
                     .collect::<SmallVec<[Span; 1]>>(),
             ),
             _ => None,
@@ -318,22 +318,22 @@ fn predicate_references_self<'tcx>(
     }
 }
 
-fn trait_has_sized_self(tcx: TyCtxt<'_>, trait_def_id: DefId) -> bool {
-    generics_require_sized_self(tcx, trait_def_id)
+fn trait_has_aligned_self(tcx: TyCtxt<'_>, trait_def_id: DefId) -> bool {
+    generics_require_aligned_self(tcx, trait_def_id)
 }
 
-fn generics_require_sized_self(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
-    let Some(sized_def_id) = tcx.lang_items().sized_trait() else {
-        return false; /* No Sized trait, can't require it! */
+fn generics_require_aligned_self(tcx: TyCtxt<'_>, def_id: DefId) -> bool {
+    let Some(aligned_def_id) = tcx.lang_items().aligned_trait().or_else(|| tcx.lang_items().sized_trait()) else {
+        return false; /* No Aligned trait, can't require it! */
     };
 
-    // Search for a predicate like `Self : Sized` amongst the trait bounds.
+    // Search for a predicate like `Self : Aligned` amongst the trait bounds.
     let predicates = tcx.predicates_of(def_id);
     let predicates = predicates.instantiate_identity(tcx).predicates;
     elaborate_predicates(tcx, predicates.into_iter()).any(|obligation| {
         match obligation.predicate.kind().skip_binder() {
             ty::PredicateKind::Trait(ref trait_pred) => {
-                trait_pred.def_id() == sized_def_id && trait_pred.self_ty().is_param(0)
+                trait_pred.def_id() == aligned_def_id && trait_pred.self_ty().is_param(0)
             }
             ty::PredicateKind::Projection(..)
             | ty::PredicateKind::Subtype(..)
@@ -357,9 +357,9 @@ fn object_safety_violation_for_method(
     method: &ty::AssocItem,
 ) -> Option<(MethodViolationCode, Span)> {
     debug!("object_safety_violation_for_method({:?}, {:?})", trait_def_id, method);
-    // Any method that has a `Self : Sized` requisite is otherwise
+    // Any method that has a `Self : Aligned` requisite is otherwise
     // exempt from the regulations.
-    if generics_require_sized_self(tcx, method.def_id) {
+    if generics_require_aligned_self(tcx, method.def_id) {
         return None;
     }
 
@@ -382,7 +382,7 @@ fn object_safety_violation_for_method(
 /// Returns `Some(_)` if this method cannot be called on a trait
 /// object; this does not necessarily imply that the enclosing trait
 /// is not object safe, because the method might have a where clause
-/// `Self:Sized`.
+/// `Self: Aligned`.
 fn virtual_call_violation_for_method<'tcx>(
     tcx: TyCtxt<'tcx>,
     trait_def_id: DefId,
@@ -405,7 +405,10 @@ fn virtual_call_violation_for_method<'tcx>(
                     sm.span_through_char(sig.span, '(').shrink_to_hi(),
                 ),
                 (
-                    format!("{} Self: Sized", generics.add_where_or_trailing_comma()),
+                    format!(
+                        "{} Self: core::marker::Aligned",
+                        generics.add_where_or_trailing_comma()
+                    ),
                     generics.tail_span_for_predicate_suggestion(),
                 ),
             ))

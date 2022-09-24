@@ -885,8 +885,8 @@ pub struct ImplSourceTraitAliasData<'tcx, N> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, HashStable, PartialOrd, Ord)]
 pub enum ObjectSafetyViolation {
-    /// `Self: Sized` declared on the trait.
-    SizedSelf(SmallVec<[Span; 1]>),
+    /// `Self: Aligned` declared on the trait.
+    AlignedSelf(SmallVec<[Span; 1]>),
 
     /// Supertrait reference references `Self` an in illegal location
     /// (e.g., `trait Foo : Bar<Self>`).
@@ -905,7 +905,7 @@ pub enum ObjectSafetyViolation {
 impl ObjectSafetyViolation {
     pub fn error_msg(&self) -> Cow<'static, str> {
         match self {
-            ObjectSafetyViolation::SizedSelf(_) => "it requires `Self: Sized`".into(),
+            ObjectSafetyViolation::AlignedSelf(_) => "it requires `Self: Aligned`".into(),
             ObjectSafetyViolation::SupertraitSelf(ref spans) => {
                 if spans.iter().any(|sp| *sp != DUMMY_SP) {
                     "it uses `Self` as a type parameter".into()
@@ -961,7 +961,7 @@ impl ObjectSafetyViolation {
 
     pub fn solution(&self, err: &mut Diagnostic) {
         match self {
-            ObjectSafetyViolation::SizedSelf(_) | ObjectSafetyViolation::SupertraitSelf(_) => {}
+            ObjectSafetyViolation::AlignedSelf(_) | ObjectSafetyViolation::SupertraitSelf(_) => {}
             ObjectSafetyViolation::Method(
                 name,
                 MethodViolationCode::StaticMethod(Some((add_self_sugg, make_sized_sugg))),
@@ -1015,7 +1015,7 @@ impl ObjectSafetyViolation {
         // diagnostics use a `note` instead of a `span_label`.
         match self {
             ObjectSafetyViolation::SupertraitSelf(spans)
-            | ObjectSafetyViolation::SizedSelf(spans) => spans.clone(),
+            | ObjectSafetyViolation::AlignedSelf(spans) => spans.clone(),
             ObjectSafetyViolation::AssocConst(_, span)
             | ObjectSafetyViolation::GAT(_, span)
             | ObjectSafetyViolation::Method(_, _, span)
@@ -1032,7 +1032,7 @@ impl ObjectSafetyViolation {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, HashStable, PartialOrd, Ord)]
 pub enum MethodViolationCode {
     /// e.g., `fn foo()`
-    StaticMethod(Option<(/* add &self */ (String, Span), /* add Self: Sized */ (String, Span))>),
+    StaticMethod(Option<(/* add &self */ (String, Span), /* add Self: Aligned */ (String, Span))>),
 
     /// e.g., `fn foo(&self, x: Self)`
     ReferencesSelfInput(Option<Span>),

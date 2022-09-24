@@ -241,6 +241,8 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
             let trait_def = obligation.predicate.def_id();
             let conditions = if Some(trait_def) == lang_items.sized_trait() {
                 self.sized_conditions(obligation)
+            } else if Some(trait_def) == lang_items.aligned_trait() {
+                self.aligned_conditions(obligation)
             } else if Some(trait_def) == lang_items.copy_trait() {
                 self.copy_clone_conditions(obligation)
             } else if Some(trait_def) == lang_items.clone_trait() {

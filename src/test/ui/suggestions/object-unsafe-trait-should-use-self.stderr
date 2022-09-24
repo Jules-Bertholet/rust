@@ -21,7 +21,7 @@ note: for a trait to be "object safe" it needs to allow building a vtable to all
   --> $DIR/object-unsafe-trait-should-use-self.rs:2:10
    |
 LL | trait A: Sized {
-   |       -  ^^^^^ ...because it requires `Self: Sized`
+   |       -  ^^^^^ ...because it requires `Self: Aligned`
    |       |
    |       this trait cannot be made into an object...
 
@@ -57,8 +57,8 @@ LL |     fn f(&self, a: B) -> B;
    |          ++++++
 help: alternatively, consider constraining `f` so it does not apply to trait objects
    |
-LL |     fn f(a: B) -> B where Self: Sized;
-   |                     +++++++++++++++++
+LL |     fn f(a: B) -> B where Self: core::marker::Aligned;
+   |                     +++++++++++++++++++++++++++++++++
 
 error: aborting due to 4 previous errors
 

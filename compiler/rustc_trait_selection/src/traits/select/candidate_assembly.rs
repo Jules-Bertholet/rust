@@ -301,6 +301,11 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
                 // always automatically computed.
                 let sized_conditions = self.sized_conditions(obligation);
                 self.assemble_builtin_bound_candidates(sized_conditions, &mut candidates);
+            } else if lang_items.aligned_trait() == Some(def_id) {
+                // Aligned is never implementable by end-users, it is
+                // always automatically computed.
+                let aligned_conditions = self.aligned_conditions(obligation);
+                self.assemble_builtin_bound_candidates(aligned_conditions, &mut candidates);
             } else if lang_items.unsize_trait() == Some(def_id) {
                 self.assemble_candidates_for_unsizing(obligation, &mut candidates);
             } else if lang_items.destruct_trait() == Some(def_id) {

@@ -80,6 +80,18 @@ fn enforce_trait_manually_implementable(
         return;
     }
 
+    if did == li.aligned_trait() {
+        struct_span_err!(
+            tcx.sess,
+            impl_header_span,
+            E0322,
+            "explicit impls for the `Aligned` trait are not permitted"
+        )
+        .span_label(impl_header_span, "impl of `Aligned` not allowed")
+        .emit();
+        return;
+    }
+
     if did == li.unsize_trait() {
         struct_span_err!(
             tcx.sess,

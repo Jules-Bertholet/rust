@@ -26,7 +26,7 @@ note: for a trait to be "object safe" it needs to allow building a vtable to all
   --> $DIR/object-unsafe-trait-references-self.rs:8:14
    |
 LL | trait Other: Sized {}
-   |       -----  ^^^^^ ...because it requires `Self: Sized`
+   |       -----  ^^^^^ ...because it requires `Self: Aligned`
    |       |
    |       this trait cannot be made into an object...
 

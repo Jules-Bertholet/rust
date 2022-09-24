@@ -340,6 +340,7 @@ symbols! {
         alias,
         align,
         align_offset,
+        aligned,
         alignment,
         alignstack,
         all,

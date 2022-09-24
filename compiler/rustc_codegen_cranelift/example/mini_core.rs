@@ -13,8 +13,11 @@
 #![no_core]
 #![allow(dead_code)]
 
+#[lang = "aligned"]
+pub trait Aligned {}
+
 #[lang = "sized"]
-pub trait Sized {}
+pub trait Sized: Aligned {}
 
 #[lang = "destruct"]
 pub trait Destruct {}
@@ -562,7 +565,7 @@ pub mod intrinsics {
         pub fn abort() -> !;
         pub fn size_of<T>() -> usize;
         pub fn size_of_val<T: ?::Sized>(val: *const T) -> usize;
-        pub fn min_align_of<T>() -> usize;
+        pub fn min_align_of<T: ?::Sized + ::Aligned>() -> usize;
         pub fn min_align_of_val<T: ?::Sized>(val: *const T) -> usize;
         pub fn copy<T>(src: *const T, dst: *mut T, count: usize);
         pub fn transmute<T, U>(e: T) -> U;

@@ -1886,6 +1886,69 @@ impl<'cx, 'tcx> SelectionContext<'cx, 'tcx> {
         }
     }
 
+    // equivalent to `sized_conditions`, except `ty::Str` and `ty::Slice(_)` are also aligned
+    fn aligned_conditions(
+        &mut self,
+        obligation: &TraitObligation<'tcx>,
+    ) -> BuiltinImplConditions<'tcx> {
+        use self::BuiltinImplConditions::{Ambiguous, None, Where};
+
+        // NOTE: binder moved to (*)
+        let self_ty = self.infcx.shallow_resolve(obligation.predicate.skip_binder().self_ty());
+
+        match self_ty.kind() {
+            ty::Infer(ty::IntVar(_) | ty::FloatVar(_))
+            | ty::Uint(_)
+            | ty::Int(_)
+            | ty::Bool
+            | ty::Float(_)
+            | ty::FnDef(..)
+            | ty::FnPtr(_)
+            | ty::RawPtr(..)
+            | ty::Char
+            | ty::Ref(..)
+            | ty::Generator(..)
+            | ty::GeneratorWitness(..)
+            | ty::Array(..)
+            | ty::Closure(..)
+            | ty::Never
+            | ty::Dynamic(_, _, ty::DynStar)
+            | ty::Error(_)
+            | ty::Str
+            | ty::Slice(_) => {
+                // safe for everything
+                Where(ty::Binder::dummy(Vec::new()))
+            }
+
+            ty::Dynamic(..) | ty::Foreign(..) => None,
+
+            ty::Tuple(tys) => Where(
+                obligation.predicate.rebind(tys.last().map_or_else(Vec::new, |&last| vec![last])),
+            ),
+
+            ty::Adt(def, substs) => {
+                let aligned_crit = def.aligned_constraint(self.tcx());
+                // (*) binder moved here
+                Where(obligation.predicate.rebind({
+                    aligned_crit
+                        .0
+                        .iter()
+                        .map(|ty| aligned_crit.rebind(*ty).subst(self.tcx(), substs))
+                        .collect()
+                }))
+            }
+
+            ty::Projection(_) | ty::Param(_) | ty::Opaque(..) => None,
+            ty::Infer(ty::TyVar(_)) => Ambiguous,
+
+            ty::Placeholder(..)
+            | ty::Bound(..)
+            | ty::Infer(ty::FreshTy(_) | ty::FreshIntTy(_) | ty::FreshFloatTy(_)) => {
+                bug!("asked to assemble builtin bounds of unexpected type: {:?}", self_ty);
+            }
+        }
+    }
+
     fn copy_clone_conditions(
         &mut self,
         obligation: &TraitObligation<'tcx>,

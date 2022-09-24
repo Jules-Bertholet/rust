@@ -2161,6 +2161,48 @@ impl<'tcx> Ty<'tcx> {
         }
     }
 
+    /// Fast path helper for testing if a type is `Aligned`.
+    ///
+    /// See above
+    pub fn is_trivially_aligned(self, tcx: TyCtxt<'tcx>) -> bool {
+        match self.kind() {
+            ty::Infer(ty::IntVar(_) | ty::FloatVar(_))
+            | ty::Uint(_)
+            | ty::Int(_)
+            | ty::Bool
+            | ty::Float(_)
+            | ty::FnDef(..)
+            | ty::FnPtr(_)
+            | ty::RawPtr(..)
+            | ty::Char
+            | ty::Ref(..)
+            | ty::Generator(..)
+            | ty::GeneratorWitness(..)
+            | ty::Array(..)
+            | ty::Closure(..)
+            | ty::Never
+            | ty::Error(_)
+            | ty::Str
+            | ty::Slice(_) => true,
+
+            ty::Dynamic(..) | ty::Foreign(..) => false,
+
+            ty::Tuple(tys) => tys.iter().all(|ty| ty.is_trivially_aligned(tcx)),
+
+            ty::Adt(def, _substs) => def.aligned_constraint(tcx).0.is_empty(),
+
+            ty::Projection(_) | ty::Param(_) | ty::Opaque(..) => false,
+
+            ty::Infer(ty::TyVar(_)) => false,
+
+            ty::Bound(..)
+            | ty::Placeholder(..)
+            | ty::Infer(ty::FreshTy(_) | ty::FreshIntTy(_) | ty::FreshFloatTy(_)) => {
+                bug!("`is_trivially_aligned` applied to unexpected type: {:?}", self)
+            }
+        }
+    }
+
     /// Fast path helper for primitives which are always `Copy` and which
     /// have a side-effect-free `Clone` impl.
     ///

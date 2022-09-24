@@ -78,6 +78,10 @@ pub trait DerivedTypeMethods<'tcx>: BaseTypeMethods<'tcx> + MiscMethods<'tcx> {
         ty.is_sized(self.tcx().at(DUMMY_SP), ty::ParamEnv::reveal_all())
     }
 
+    fn type_is_aligned(&self, ty: Ty<'tcx>) -> bool {
+        ty.is_aligned(self.tcx().at(DUMMY_SP), ty::ParamEnv::reveal_all())
+    }
+
     fn type_is_freeze(&self, ty: Ty<'tcx>) -> bool {
         ty.is_freeze(self.tcx().at(DUMMY_SP), ty::ParamEnv::reveal_all())
     }

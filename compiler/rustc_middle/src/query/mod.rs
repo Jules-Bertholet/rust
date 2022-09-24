@@ -594,6 +594,14 @@ rustc_queries! {
         cycle_delay_bug
     }
 
+    // See above.
+    query adt_aligned_constraint(
+        key: DefId
+    ) -> AdtAlignedConstraint<'tcx> {
+        desc { |tcx| "computing `Aligned` constraints for `{}`", tcx.def_path_str(key) }
+        cycle_delay_bug
+    }
+
     query adt_dtorck_constraint(
         key: DefId
     ) -> Result<&'tcx DropckConstraint<'tcx>, NoSolution> {
@@ -1251,6 +1259,11 @@ rustc_queries! {
     /// Query backing `Ty::is_sized`.
     query is_sized_raw(env: ty::ParamEnvAnd<'tcx, Ty<'tcx>>) -> bool {
         desc { "computing whether `{}` is `Sized`", env.value }
+        remap_env_constness
+    }
+    /// Query backing `Ty::is_aligned`.
+    query is_aligned_raw(env: ty::ParamEnvAnd<'tcx, Ty<'tcx>>) -> bool {
+        desc { "computing whether `{}` is `Aligned`", env.value }
         remap_env_constness
     }
     /// Query backing `Ty::is_freeze`.

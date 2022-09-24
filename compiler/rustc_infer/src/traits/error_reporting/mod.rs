@@ -60,10 +60,10 @@ pub fn report_object_safety_error<'tcx>(
     let mut multi_span = vec![];
     let mut messages = vec![];
     for violation in violations {
-        if let ObjectSafetyViolation::SizedSelf(sp) = &violation && !sp.is_empty() {
-            // Do not report `SizedSelf` without spans pointing at `SizedSelf` obligations
+        if let ObjectSafetyViolation::AlignedSelf(sp) = &violation && !sp.is_empty() {
+            // Do not report `AlignedSelf` without spans pointing at `AlignedSelf` obligations
             // with a `Span`.
-            reported_violations.insert(ObjectSafetyViolation::SizedSelf(vec![].into()));
+            reported_violations.insert(ObjectSafetyViolation::AlignedSelf(vec![].into()));
         }
         if reported_violations.insert(violation.clone()) {
             let spans = violation.spans();

@@ -14,6 +14,10 @@ fn is_sized_raw<'tcx>(tcx: TyCtxt<'tcx>, query: ty::ParamEnvAnd<'tcx, Ty<'tcx>>)
     is_item_raw(tcx, query, LangItem::Sized)
 }
 
+fn is_aligned_raw<'tcx>(tcx: TyCtxt<'tcx>, query: ty::ParamEnvAnd<'tcx, Ty<'tcx>>) -> bool {
+    is_item_raw(tcx, query, LangItem::Aligned)
+}
+
 fn is_freeze_raw<'tcx>(tcx: TyCtxt<'tcx>, query: ty::ParamEnvAnd<'tcx, Ty<'tcx>>) -> bool {
     is_item_raw(tcx, query, LangItem::Freeze)
 }
@@ -44,6 +48,7 @@ pub(crate) fn provide(providers: &mut ty::query::Providers) {
     *providers = ty::query::Providers {
         is_copy_raw,
         is_sized_raw,
+        is_aligned_raw,
         is_freeze_raw,
         is_unpin_raw,
         ..*providers

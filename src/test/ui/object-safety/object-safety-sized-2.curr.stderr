@@ -10,7 +10,7 @@ note: for a trait to be "object safe" it needs to allow building a vtable to all
 LL | trait Bar
    |       --- this trait cannot be made into an object...
 LL |     where Self : Sized
-   |                  ^^^^^ ...because it requires `Self: Sized`
+   |                  ^^^^^ ...because it requires `Self: Aligned`
 
 error: aborting due to previous error
 

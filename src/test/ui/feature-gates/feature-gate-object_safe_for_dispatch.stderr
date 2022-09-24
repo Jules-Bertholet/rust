@@ -8,7 +8,7 @@ note: for a trait to be "object safe" it needs to allow building a vtable to all
   --> $DIR/feature-gate-object_safe_for_dispatch.rs:4:23
    |
 LL | trait NonObjectSafe1: Sized {}
-   |       --------------  ^^^^^ ...because it requires `Self: Sized`
+   |       --------------  ^^^^^ ...because it requires `Self: Aligned`
    |       |
    |       this trait cannot be made into an object...
 
@@ -31,8 +31,8 @@ LL |     fn static_fn(&self) {}
    |                  +++++
 help: alternatively, consider constraining `static_fn` so it does not apply to trait objects
    |
-LL |     fn static_fn() where Self: Sized {}
-   |                    +++++++++++++++++
+LL |     fn static_fn() where Self: core::marker::Aligned {}
+   |                    +++++++++++++++++++++++++++++++++
 
 error[E0038]: the trait `NonObjectSafe3` cannot be made into an object
   --> $DIR/feature-gate-object_safe_for_dispatch.rs:27:39
@@ -74,7 +74,7 @@ note: for a trait to be "object safe" it needs to allow building a vtable to all
   --> $DIR/feature-gate-object_safe_for_dispatch.rs:4:23
    |
 LL | trait NonObjectSafe1: Sized {}
-   |       --------------  ^^^^^ ...because it requires `Self: Sized`
+   |       --------------  ^^^^^ ...because it requires `Self: Aligned`
    |       |
    |       this trait cannot be made into an object...
 

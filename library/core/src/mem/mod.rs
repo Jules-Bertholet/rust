@@ -10,7 +10,7 @@ use crate::cmp;
 use crate::fmt;
 use crate::hash;
 use crate::intrinsics;
-use crate::marker::{Copy, DiscriminantKind, Sized};
+use crate::marker::{Aligned, Copy, DiscriminantKind, Sized};
 use crate::ptr;
 
 mod manually_drop;
@@ -413,7 +413,7 @@ pub const unsafe fn size_of_val_raw<T: ?Sized>(val: *const T) -> usize {
 #[must_use]
 #[stable(feature = "rust1", since = "1.0.0")]
 #[deprecated(note = "use `align_of` instead", since = "1.2.0")]
-pub fn min_align_of<T>() -> usize {
+pub fn min_align_of<T: ?Sized + Aligned>() -> usize {
     intrinsics::min_align_of::<T>()
 }
 
@@ -461,7 +461,7 @@ pub fn min_align_of_val<T: ?Sized>(val: &T) -> usize {
 #[stable(feature = "rust1", since = "1.0.0")]
 #[rustc_promotable]
 #[rustc_const_stable(feature = "const_align_of", since = "1.24.0")]
-pub const fn align_of<T>() -> usize {
+pub const fn align_of<T: ?Sized + Aligned>() -> usize {
     intrinsics::min_align_of::<T>()
 }
 

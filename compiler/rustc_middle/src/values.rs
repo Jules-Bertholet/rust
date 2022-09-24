@@ -1,4 +1,4 @@
-use rustc_middle::ty::{self, AdtSizedConstraint, Ty, TyCtxt};
+use rustc_middle::ty::{self, AdtAlignedConstraint, AdtSizedConstraint, Ty, TyCtxt};
 use rustc_query_system::Value;
 
 impl<'tcx> Value<TyCtxt<'tcx>> for Ty<'_> {
@@ -28,6 +28,18 @@ impl<'tcx> Value<TyCtxt<'tcx>> for AdtSizedConstraint<'_> {
         unsafe {
             std::mem::transmute::<AdtSizedConstraint<'tcx>, AdtSizedConstraint<'_>>(
                 AdtSizedConstraint(tcx.intern_type_list(&[tcx.ty_error()])),
+            )
+        }
+    }
+}
+
+impl<'tcx> Value<TyCtxt<'tcx>> for AdtAlignedConstraint<'_> {
+    fn from_cycle_error(tcx: TyCtxt<'tcx>) -> Self {
+        // SAFETY: This is never called when `Self` is not `AdtAlignedConstraint<'tcx>`.
+        // FIXME: Represent the above fact in the trait system somehow.
+        unsafe {
+            std::mem::transmute::<AdtAlignedConstraint<'tcx>, AdtAlignedConstraint<'_>>(
+                AdtAlignedConstraint(tcx.intern_type_list(&[tcx.ty_error()])),
             )
         }
     }

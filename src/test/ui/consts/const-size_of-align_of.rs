@@ -20,7 +20,8 @@ const fn packed_union_size_of<A, B>() -> usize {
     max_usize(mem::size_of::<A>(), mem::size_of::<B>())
 }
 
-const fn union_align_of<A, B>() -> usize {
+const fn union_align_of<A: ?Sized + core::marker::Aligned, B: ?Sized + core::marker::Aligned>()
+-> usize {
     max_usize(mem::align_of::<A>(), mem::align_of::<B>())
 }
 
@@ -29,12 +30,12 @@ const fn union_size_of<A, B>() -> usize {
 }
 
 macro_rules! fake_union {
-    ($name:ident { $a:ty, $b:ty }) => (
+    ($name:ident { $a:ty, $b:ty }) => {
         struct $name {
             _align: ([$a; 0], [$b; 0]),
-            _bytes: [u8; union_size_of::<$a, $b>()]
+            _bytes: [u8; union_size_of::<$a, $b>()],
         }
-    )
+    };
 }
 
 // Check that we can (poorly) emulate unions by

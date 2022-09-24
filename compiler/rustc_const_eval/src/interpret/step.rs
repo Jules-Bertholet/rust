@@ -259,16 +259,18 @@ impl<'mir, 'tcx: 'mir, M: Machine<'mir, 'tcx>> InterpCx<'mir, 'tcx, M> {
             NullaryOp(null_op, ty) => {
                 let ty = self.subst_from_current_frame_and_normalize_erasing_regions(ty)?;
                 let layout = self.layout_of(ty)?;
-                if layout.is_unsized() {
-                    // FIXME: This should be a span_bug (#80742)
-                    self.tcx.sess.delay_span_bug(
-                        self.frame().current_span(),
-                        &format!("Nullary MIR operator called for unsized type {}", ty),
-                    );
-                    throw_inval!(SizeOfUnsizedType(ty));
-                }
                 let val = match null_op {
-                    mir::NullOp::SizeOf => layout.size.bytes(),
+                    mir::NullOp::SizeOf => {
+                        if layout.is_unsized() {
+                            // FIXME: This should be a span_bug (#80742)
+                            self.tcx.sess.delay_span_bug(
+                                self.frame().current_span(),
+                                &format!("SizeOf MIR operator called for unsized type {}", ty),
+                            );
+                            throw_inval!(SizeOfUnsizedType(ty));
+                        }
+                        layout.size.bytes()
+                    }
                     mir::NullOp::AlignOf => layout.align.abi.bytes(),
                 };
                 self.write_scalar(Scalar::from_machine_usize(val, self), &dest)?;

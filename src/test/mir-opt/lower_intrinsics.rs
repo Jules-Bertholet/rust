@@ -17,7 +17,7 @@ pub fn size_of<T>() -> usize {
 }
 
 // EMIT_MIR lower_intrinsics.align_of.LowerIntrinsics.diff
-pub fn align_of<T>() -> usize {
+pub fn align_of<T: ?Sized + core::marker::Aligned>() -> usize {
     core::intrinsics::min_align_of::<T>()
 }
 

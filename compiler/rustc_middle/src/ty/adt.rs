@@ -29,6 +29,9 @@ use super::{
 #[derive(Copy, Clone, HashStable, Debug)]
 pub struct AdtSizedConstraint<'tcx>(pub &'tcx [Ty<'tcx>]);
 
+#[derive(Copy, Clone, HashStable, Debug)]
+pub struct AdtAlignedConstraint<'tcx>(pub &'tcx [Ty<'tcx>]);
+
 bitflags! {
     #[derive(HashStable, TyEncodable, TyDecodable)]
     pub struct AdtFlags: u32 {
@@ -565,5 +568,11 @@ impl<'tcx> AdtDef<'tcx> {
     /// the associated type is behind a pointer (e.g., issue #31299).
     pub fn sized_constraint(self, tcx: TyCtxt<'tcx>) -> ty::EarlyBinder<&'tcx [Ty<'tcx>]> {
         ty::EarlyBinder(tcx.adt_sized_constraint(self.did()).0)
+    }
+
+    /// Returns a list of types such that `Self: Aligned` if and only
+    /// if that type is `Aligned`, or `TyErr` if this type is recursive.
+    pub fn aligned_constraint(self, tcx: TyCtxt<'tcx>) -> ty::EarlyBinder<&'tcx [Ty<'tcx>]> {
+        ty::EarlyBinder(tcx.adt_aligned_constraint(self.did()).0)
     }
 }

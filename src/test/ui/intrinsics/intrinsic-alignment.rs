@@ -5,8 +5,8 @@
 
 mod rusti {
     extern "rust-intrinsic" {
-        pub fn pref_align_of<T>() -> usize;
-        pub fn min_align_of<T>() -> usize;
+        pub fn pref_align_of<T: ?Sized + core::marker::Aligned>() -> usize;
+        pub fn min_align_of<T: ?Sized + core::marker::Aligned>() -> usize;
     }
 }
 
@@ -28,6 +28,8 @@ mod m {
         unsafe {
             assert_eq!(::rusti::pref_align_of::<u64>(), 8);
             assert_eq!(::rusti::min_align_of::<u64>(), 4);
+            assert_eq!(::rusti::pref_align_of::<[u64]>(), 8);
+            assert_eq!(::rusti::min_align_of::<[u64]>(), 4);
         }
     }
 
@@ -36,6 +38,8 @@ mod m {
         unsafe {
             assert_eq!(::rusti::pref_align_of::<u64>(), 8);
             assert_eq!(::rusti::min_align_of::<u64>(), 8);
+            assert_eq!(::rusti::pref_align_of::<[u64]>(), 8);
+            assert_eq!(::rusti::min_align_of::<[u64]>(), 8);
         }
     }
 }
@@ -47,6 +51,8 @@ mod m {
         unsafe {
             assert_eq!(::rusti::pref_align_of::<u64>(), 8);
             assert_eq!(::rusti::min_align_of::<u64>(), 8);
+            assert_eq!(::rusti::pref_align_of::<[u64]>(), 8);
+            assert_eq!(::rusti::min_align_of::<[u64]>(), 8);
         }
     }
 }
@@ -57,6 +63,8 @@ mod m {
         unsafe {
             assert_eq!(::rusti::pref_align_of::<u64>(), 8);
             assert_eq!(::rusti::min_align_of::<u64>(), 8);
+            assert_eq!(::rusti::pref_align_of::<[u64]>(), 8);
+            assert_eq!(::rusti::min_align_of::<[u64]>(), 8);
         }
     }
 }

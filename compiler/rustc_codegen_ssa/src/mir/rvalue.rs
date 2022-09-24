@@ -461,11 +461,17 @@ impl<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>> FunctionCx<'a, 'tcx, Bx> {
 
             mir::Rvalue::NullaryOp(null_op, ty) => {
                 let ty = self.monomorphize(ty);
-                assert!(bx.cx().type_is_sized(ty));
+
                 let layout = bx.cx().layout_of(ty);
                 let val = match null_op {
-                    mir::NullOp::SizeOf => layout.size.bytes(),
-                    mir::NullOp::AlignOf => layout.align.abi.bytes(),
+                    mir::NullOp::SizeOf => {
+                        assert!(bx.cx().type_is_sized(ty));
+                        layout.size.bytes()
+                    }
+                    mir::NullOp::AlignOf => {
+                        assert!(bx.cx().type_is_aligned(ty));
+                        layout.align.abi.bytes()
+                    }
                 };
                 let val = bx.cx().const_usize(val);
                 let tcx = self.cx.tcx();

@@ -54,6 +54,7 @@
 )]
 #![allow(missing_docs)]
 
+use crate::marker::Aligned;
 #[cfg(bootstrap)]
 use crate::marker::Destruct;
 use crate::marker::DiscriminantKind;
@@ -889,13 +890,13 @@ extern "rust-intrinsic" {
     ///
     /// The stabilized version of this intrinsic is [`core::mem::align_of`].
     #[rustc_const_stable(feature = "const_min_align_of", since = "1.40.0")]
-    pub fn min_align_of<T>() -> usize;
+    pub fn min_align_of<T: ?Sized + Aligned>() -> usize;
     /// The preferred alignment of a type.
     ///
     /// This intrinsic does not have a stable counterpart.
     /// It's "tracking issue" is [#91971](https://github.com/rust-lang/rust/issues/91971).
     #[rustc_const_unstable(feature = "const_pref_align_of", issue = "91971")]
-    pub fn pref_align_of<T>() -> usize;
+    pub fn pref_align_of<T: ?Sized + Aligned>() -> usize;
 
     /// The size of the referenced value in bytes.
     ///

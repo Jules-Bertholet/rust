@@ -17,8 +17,8 @@ LL |     fn foo(&self) {}
    |            +++++
 help: alternatively, consider constraining `foo` so it does not apply to trait objects
    |
-LL |     fn foo() where Self: Sized {}
-   |              +++++++++++++++++
+LL |     fn foo() where Self: core::marker::Aligned {}
+   |              +++++++++++++++++++++++++++++++++
 
 error: aborting due to previous error
 

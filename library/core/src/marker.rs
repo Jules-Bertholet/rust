@@ -44,6 +44,36 @@ impl<T: ?Sized> !Send for *const T {}
 #[stable(feature = "rust1", since = "1.0.0")]
 impl<T: ?Sized> !Send for *mut T {}
 
+/// Types with a constant alignment known at compile time.
+///
+/// This is a supertrait of [`Sized`], and therefore implied by `Sized`'s
+/// implicit bound, as described in that trait's documentation.
+/// `?Sized` opts out of the implicit `Aligned` bound as well;
+/// if you want to bound only by `Aligned`, write `?Sized + Aligned`.
+/// The only types that are `Aligned` but not `Sized` are slices and records containing them.
+///
+/// ```
+/// assert_eq!(core::mem::align_of::<[u32]>(), core::mem::align_of::<u32>());
+/// ```
+#[cfg_attr(not(bootstrap), lang = "aligned")]
+#[stable(feature = "aligned", since = "CURRENT_RUSTC_VERSION")]
+#[rustc_on_unimplemented(
+    message = "the size or alignment for values of type `{Self}` cannot be known at compilation time",
+    label = "doesn't have an alignment known at compile-time"
+)]
+#[rustc_specialization_trait]
+pub trait Aligned {
+    // Empty.
+}
+
+#[cfg(bootstrap)]
+#[stable(feature = "aligned", since = "CURRENT_RUSTC_VERSION")]
+impl<T> Aligned for T {}
+
+#[cfg(bootstrap)]
+#[stable(feature = "aligned", since = "CURRENT_RUSTC_VERSION")]
+impl<T> Aligned for [T] {}
+
 /// Types with a constant size known at compile time.
 ///
 /// All type parameters have an implicit bound of `Sized`. The special syntax
@@ -90,7 +120,7 @@ impl<T: ?Sized> !Send for *mut T {}
 )]
 #[fundamental] // for Default, for example, which requires that `[T]: !Default` be evaluatable
 #[rustc_specialization_trait]
-pub trait Sized {
+pub trait Sized: Aligned {
     // Empty.
 }
 

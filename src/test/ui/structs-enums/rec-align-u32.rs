@@ -9,8 +9,8 @@ use std::mem;
 
 mod rusti {
     extern "rust-intrinsic" {
-        pub fn pref_align_of<T>() -> usize;
-        pub fn min_align_of<T>() -> usize;
+        pub fn pref_align_of<T: ?Sized + core::marker::Aligned>() -> usize;
+        pub fn min_align_of<T: ?Sized + core::marker::Aligned>() -> usize;
     }
 }
 

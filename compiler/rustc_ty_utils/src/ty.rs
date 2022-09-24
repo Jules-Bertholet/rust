@@ -4,10 +4,11 @@ use rustc_hir::def_id::DefId;
 use rustc_middle::ty::{self, Binder, Predicate, PredicateKind, ToPredicate, Ty, TyCtxt};
 use rustc_trait_selection::traits;
 
-fn sized_constraint_for_ty<'tcx>(
+fn sized_aligned_constraint_for_ty<'tcx>(
     tcx: TyCtxt<'tcx>,
     adtdef: ty::AdtDef<'tcx>,
     ty: Ty<'tcx>,
+    checking_sized: bool,
 ) -> Vec<Ty<'tcx>> {
     use rustc_type_ir::sty::TyKind::*;
 
@@ -15,25 +16,34 @@ fn sized_constraint_for_ty<'tcx>(
         Bool | Char | Int(..) | Uint(..) | Float(..) | RawPtr(..) | Ref(..) | FnDef(..)
         | FnPtr(_) | Array(..) | Closure(..) | Generator(..) | Never => vec![],
 
-        Str | Dynamic(..) | Slice(_) | Foreign(..) | Error(_) | GeneratorWitness(..) => {
+        Dynamic(..) | Foreign(..) | Error(_) | GeneratorWitness(..) => {
             // these are never sized - return the target type
             vec![ty]
         }
 
+        Str | Slice(_) => {
+            // these are aligned but not sized
+            if checking_sized { vec![ty] } else { vec![] }
+        }
+
         Tuple(ref tys) => match tys.last() {
             None => vec![],
-            Some(&ty) => sized_constraint_for_ty(tcx, adtdef, ty),
+            Some(&ty) => sized_aligned_constraint_for_ty(tcx, adtdef, ty, checking_sized),
         },
 
         Adt(adt, substs) => {
             // recursive case
-            let adt_tys = adt.sized_constraint(tcx);
+            let adt_tys = if checking_sized {
+                adt.sized_constraint(tcx)
+            } else {
+                adt.aligned_constraint(tcx)
+            };
             debug!("sized_constraint_for_ty({:?}) intermediate = {:?}", ty, adt_tys);
             adt_tys
                 .0
                 .iter()
                 .map(|ty| adt_tys.rebind(*ty).subst(tcx, substs))
-                .flat_map(|ty| sized_constraint_for_ty(tcx, adtdef, ty))
+                .flat_map(|ty| sized_aligned_constraint_for_ty(tcx, adtdef, ty, checking_sized))
                 .collect()
         }
 
@@ -48,22 +58,35 @@ fn sized_constraint_for_ty<'tcx>(
             // we know that `T` is Sized and do not need to check
             // it on the impl.
 
-            let Some(sized_trait) = tcx.lang_items().sized_trait() else { return vec![ty] };
-            let sized_predicate = ty::Binder::dummy(ty::TraitRef {
-                def_id: sized_trait,
+            let trait_to_check = if checking_sized {
+                tcx.lang_items().sized_trait()
+            } else {
+                tcx.lang_items().aligned_trait()
+            };
+
+            let Some(sized_aligned_trait) = trait_to_check else { return vec![ty] };
+            let sized_aligned_predicate = ty::Binder::dummy(ty::TraitRef {
+                def_id: sized_aligned_trait,
                 substs: tcx.mk_substs_trait(ty, &[]),
             })
             .without_const()
             .to_predicate(tcx);
             let predicates = tcx.predicates_of(adtdef.did()).predicates;
-            if predicates.iter().any(|(p, _)| *p == sized_predicate) { vec![] } else { vec![ty] }
+            if predicates.iter().any(|(p, _)| *p == sized_aligned_predicate) {
+                vec![]
+            } else {
+                vec![ty]
+            }
         }
 
         Placeholder(..) | Bound(..) | Infer(..) => {
-            bug!("unexpected type `{:?}` in sized_constraint_for_ty", ty)
+            bug!("unexpected type `{:?}` in sized_aligned_constraint_for_ty", ty)
         }
     };
-    debug!("sized_constraint_for_ty({:?}) = {:?}", ty, result);
+    debug!(
+        "sized_aligned_constraint_for_ty({:?}, checking_sized = {:?}) = {:?}",
+        ty, checking_sized, result
+    );
     result
 }
 
@@ -94,12 +117,30 @@ fn adt_sized_constraint(tcx: TyCtxt<'_>, def_id: DefId) -> ty::AdtSizedConstrain
         def.variants()
             .iter()
             .flat_map(|v| v.fields.last())
-            .flat_map(|f| sized_constraint_for_ty(tcx, def, tcx.type_of(f.did))),
+            .flat_map(|f| sized_aligned_constraint_for_ty(tcx, def, tcx.type_of(f.did), true)),
     );
 
     debug!("adt_sized_constraint: {:?} => {:?}", def, result);
 
     ty::AdtSizedConstraint(result)
+}
+
+/// Calculates the `Aligned` constraint.
+///
+/// See above.
+fn adt_aligned_constraint(tcx: TyCtxt<'_>, def_id: DefId) -> ty::AdtAlignedConstraint<'_> {
+    let def = tcx.adt_def(def_id);
+
+    let result = tcx.mk_type_list(
+        def.variants()
+            .iter()
+            .flat_map(|v| v.fields.last())
+            .flat_map(|f| sized_aligned_constraint_for_ty(tcx, def, tcx.type_of(f.did), false)),
+    );
+
+    debug!("adt_aligned_constraint: {:?} => {:?}", def, result);
+
+    ty::AdtAlignedConstraint(result)
 }
 
 /// See `ParamEnv` struct definition for details.
@@ -467,6 +508,7 @@ pub fn provide(providers: &mut ty::query::Providers) {
     *providers = ty::query::Providers {
         asyncness,
         adt_sized_constraint,
+        adt_aligned_constraint,
         param_env,
         param_env_reveal_all_normalized,
         instance_def_size_estimate,

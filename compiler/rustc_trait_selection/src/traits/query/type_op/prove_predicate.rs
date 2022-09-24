@@ -16,7 +16,13 @@ impl<'tcx> super::QueryTypeOp<'tcx> for ProvePredicate<'tcx> {
         // we have to prove. No need to canonicalize and all that for
         // such cases.
         if let ty::PredicateKind::Trait(trait_ref) = key.value.predicate.kind().skip_binder() {
-            if let Some(sized_def_id) = tcx.lang_items().sized_trait() {
+            if let Some(aligned_def_id) = tcx.lang_items().aligned_trait() {
+                if trait_ref.def_id() == aligned_def_id {
+                    if trait_ref.self_ty().is_trivially_aligned(tcx) {
+                        return Some(());
+                    }
+                }
+            } else if let Some(sized_def_id) = tcx.lang_items().sized_trait() {
                 if trait_ref.def_id() == sized_def_id {
                     if trait_ref.self_ty().is_trivially_sized(tcx) {
                         return Some(());
