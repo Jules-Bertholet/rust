@@ -31,6 +31,23 @@ impl PartialEq for str {
     }
 }
 
+#[stable(feature = "partialeq_char_str", since = "CURRENT_RUSTC_VERSION")]
+impl PartialEq<char> for str {
+    #[inline]
+    fn eq(&self, other: &char) -> bool {
+        let mut chars = self.chars();
+        chars.next() == Some(*other) && chars.as_str() == ""
+    }
+}
+
+#[stable(feature = "partialeq_char_str", since = "CURRENT_RUSTC_VERSION")]
+impl PartialEq<str> for char {
+    #[inline]
+    fn eq(&self, other: &str) -> bool {
+        *other == *self
+    }
+}
+
 #[stable(feature = "rust1", since = "1.0.0")]
 impl Eq for str {}
 
