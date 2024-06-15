@@ -2456,3 +2456,93 @@ fn ceil_char_boundary() {
     // above len
     check_many("hello", 5..=10, 5);
 }
+
+#[test]
+fn slice_pats() {
+    macro_rules! arr_ref_slice {
+        ($arr:expr, $test:expr $(,)?) => {
+            let arr = $arr;
+            ($test)(&arr);
+            ($test)(&arr[..]);
+            ($test)(arr);
+        };
+    }
+
+    macro_rules! slice_test {
+        ($haystack:expr, $needles:expr, $method:ident, $result:expr $(,)?) => {
+            arr_ref_slice!($needles, |arr| {
+                let v: Vec<&str> = $haystack.$method(arr).collect();
+                assert_eq!(v, $result);
+            })
+        };
+    }
+
+    slice_test!("åbcde", ['b', 'd'], split, ["å", "c", "e"]);
+    slice_test!("åbcde", ['b', 'd'], rsplit, ["e", "c", "å"]);
+
+    slice_test!("åbcde", ['d', 'b'], split, ["å", "c", "e"]);
+    slice_test!("åbcde", ['d', 'b'], rsplit, ["e", "c", "å"]);
+
+    slice_test!("åbcde", ["b", "d"], split, ["å", "c", "e"]);
+    slice_test!("åbcde", ["b", "d"], rsplit, ["e", "c", "å"]);
+    slice_test!("åbcde", ["b", "cd"], split, ["å", "", "e"]);
+    slice_test!("åbcde", ["b", "cd"], rsplit, ["e", "", "å"]);
+
+    slice_test!("åbcde", ["d", "b"], split, ["å", "c", "e"]);
+    slice_test!("åbcde", ["d", "b"], rsplit, ["e", "c", "å"]);
+    slice_test!("åbcde", ["cd", "b"], split, ["å", "", "e"]);
+    slice_test!("åbcde", ["cd", "b"], rsplit, ["e", "", "å"]);
+
+    slice_test!("åbcde", ["åbcde"], split, ["", ""]);
+    slice_test!("åbcde", ["åbcde"], rsplit, ["", ""]);
+
+    slice_test!("xåbx", ["å", "åb"], split, ["x", "bx"]);
+    slice_test!("xåbx", ["å", "åb"], rsplit, ["x", "x"]);
+    slice_test!("xåbx", ["åb", "å"], split, ["x", "x"]);
+    slice_test!("xåbx", ["åb", "å"], rsplit, ["x", "x"]);
+
+    slice_test!("xåbx", ["b", "åb"], split, ["x", "x"]);
+    slice_test!("xåbx", ["b", "åb"], rsplit, ["x", "xå"]);
+    slice_test!("xåbx", ["åb", "b"], split, ["x", "x"]);
+    slice_test!("xåbx", ["åb", "b"], rsplit, ["x", "x"]);
+
+    slice_test!("xåbåx", ["å", "åbå"], split, ["x", "b", "x"]);
+    slice_test!("xåbåx", ["å", "åbå"], rsplit, ["x", "b", "x"]);
+    slice_test!("xåbåx", ["åbå", "å"], split, ["x", "x"]);
+    slice_test!("xåbåx", ["åbå", "å"], rsplit, ["x", "x"]);
+
+    slice_test!("ååå", ["åå"], split, ["", "å"]);
+    slice_test!("ååå", ["åå"], rsplit, ["", "å"]);
+
+    slice_test!("ååå", ["åå", "å"], split, ["", "", ""]);
+    slice_test!("ååå", ["åå", "å"], rsplit, ["", "", ""]);
+    slice_test!("ååå", ["å", "åå"], split, ["", "", "", ""]);
+    slice_test!("ååå", ["å", "åå"], rsplit, ["", "", "", ""]);
+
+    slice_test!("", [""], split, ["", ""]);
+    slice_test!("", [""], rsplit, ["", ""]);
+
+    slice_test!("", ["", ""], split, ["", ""]);
+    slice_test!("", ["", ""], rsplit, ["", ""]);
+
+    slice_test!("åbc", [""], split, ["", "å", "b", "c", ""]);
+    slice_test!("åbc", [""], rsplit, ["", "c", "b", "å", ""]);
+
+    slice_test!("åbc", ["", ""], split, ["", "å", "b", "c", ""]);
+    slice_test!("åbc", ["", ""], rsplit, ["", "c", "b", "å", ""]);
+
+    slice_test!("åbc", ["", "å"], split, ["", "", "", "b", "c", ""]);
+    slice_test!("åbc", ["", "å"], rsplit, ["", "c", "b", "", "", ""]);
+    slice_test!("åbc", ["å", ""], split, ["", "b", "c", ""]);
+    slice_test!("åbc", ["å", ""], rsplit, ["", "c", "b", ""]);
+
+    slice_test!("åbc", ["", "b"], split, ["", "å", "", "", "c", ""]);
+    slice_test!("åbc", ["", "b"], rsplit, ["", "c", "", "", "å", ""]);
+    slice_test!("åbc", ["b", ""], split, ["", "å", "c", ""]);
+    slice_test!("åbc", ["b", ""], rsplit, ["", "c", "å", ""]);
+
+    slice_test!("åbc", ["", "c"], split, ["", "å", "b", "", "", ""]);
+    slice_test!("åbc", ["", "c"], rsplit, ["", "", "", "b", "å", ""]);
+    slice_test!("åbc", ["c", ""], split, ["", "å", "b", ""]);
+    slice_test!("åbc", ["c", ""], rsplit, ["", "b", "å", ""]);
+}

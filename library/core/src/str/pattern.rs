@@ -42,6 +42,7 @@ use crate::cmp;
 use crate::cmp::Ordering;
 use crate::convert::TryInto as _;
 use crate::fmt;
+use crate::marker::PhantomData;
 use crate::slice::memchr;
 
 // Pattern
@@ -1314,7 +1315,7 @@ struct TwoWaySearcher {
     We denote by local_period(u, v) the smallest local period of (u, v). We sometimes
     call this *the local period* of (u, v). Provided that x = uv is non-empty, this
     is well-defined (because each non-empty word has at least one factorization, as
-    noted above).
+    noted above).and optimized
 
     It can be proven that the following is an equivalent definition of a local period
     for a factorization (u, v): any positive integer r such that x[i] == x[i+r] for
@@ -1934,5 +1935,281 @@ unsafe fn small_slice_eq(x: &[u8], y: &[u8]) -> bool {
         let vx = (pxend as *const u32).read_unaligned();
         let vy = (pyend as *const u32).read_unaligned();
         vx == vy
+    }
+}
+
+// Multi-string search
+
+/// Searches for the first substring in the pattern that is found in the haystack.
+/// Strings earlier in the slice are considered first.
+///
+/// Will handle the pattern `""` as returning empty matches at each character boundary.
+///
+/// # Examples
+///
+/// ```rust
+/// assert_eq!("Hello world".find(&["ll", "o"][..]), Some(2));
+/// ```
+impl<'a, 'b, 'c> Pattern<'a> for &'b [&'c str] {
+    pattern_methods!(
+        StrSliceSearcher<'a, 'b, 'c>,
+        |slice| MultiStrPat(slice, PhantomData),
+        StrSliceSearcher
+    );
+}
+
+/// Associated type for `<&[&str] as Pattern<'_>>::Searcher`.
+#[derive(Clone, Debug)]
+pub struct StrSliceSearcher<'a, 'b, 'c>(MultiStrSearcher<'a, 'c, &'b [&'c str]>);
+
+unsafe impl<'a, 'b, 'c> Searcher<'a> for StrSliceSearcher<'a, 'b, 'c> {
+    searcher_methods!(forward);
+}
+
+unsafe impl<'a, 'b, 'c> ReverseSearcher<'a> for StrSliceSearcher<'a, 'b, 'c> {
+    searcher_methods!(reverse);
+}
+
+/// Searches for the first substring in the pattern that is found in the haystack.
+/// Strings earlier in the array are considered first.
+///
+/// Will handle the pattern `""` as returning empty matches at each character boundary.
+///
+/// # Examples
+///
+/// ```rust
+/// assert_eq!("Hello world".find(&["ll", "o"]), Some(2));
+/// ```
+impl<'a, 'b, 'c, const N: usize> Pattern<'a> for &'b [&'c str; N] {
+    pattern_methods!(
+        StrArrayRefSearcher<'a, 'b, 'c, N>,
+        |arr| MultiStrPat(arr, PhantomData),
+        StrArrayRefSearcher
+    );
+}
+
+/// Associated type for `<&[&str; N] as Pattern<'_>>::Searcher`.
+#[derive(Clone, Debug)]
+pub struct StrArrayRefSearcher<'a, 'b, 'c, const N: usize>(
+    MultiStrSearcher<'a, 'c, &'b [&'c str; N]>,
+);
+
+unsafe impl<'a, 'b, 'c, const N: usize> Searcher<'a> for StrArrayRefSearcher<'a, 'b, 'c, N> {
+    searcher_methods!(forward);
+}
+
+unsafe impl<'a, 'b, 'c, const N: usize> ReverseSearcher<'a> for StrArrayRefSearcher<'a, 'b, 'c, N> {
+    searcher_methods!(reverse);
+}
+
+/// Searches for the first substring in the pattern that is found in the haystack.
+/// Strings earlier in the array are considered first.
+///
+/// Will handle the pattern `""` as returning empty matches at each character boundary.
+///
+/// # Examples
+///
+/// ```rust
+/// assert_eq!("Hello world".find(["ll", "o"]), Some(2));
+/// ```
+impl<'a, 'c, const N: usize> Pattern<'a> for [&'c str; N] {
+    pattern_methods!(
+        StrArraySearcher<'a, 'c, N>,
+        |arr| MultiStrPat(arr, PhantomData),
+        StrArraySearcher
+    );
+}
+
+/// Associated type for `<[&str; N] as Pattern<'_>>::Searcher`.
+#[derive(Clone, Debug)]
+pub struct StrArraySearcher<'a, 'c, const N: usize>(MultiStrSearcher<'a, 'c, [&'c str; N]>);
+
+unsafe impl<'a, 'c, const N: usize> Searcher<'a> for StrArraySearcher<'a, 'c, N> {
+    searcher_methods!(forward);
+}
+
+unsafe impl<'a, 'c, const N: usize> ReverseSearcher<'a> for StrArraySearcher<'a, 'c, N> {
+    searcher_methods!(reverse);
+}
+
+trait MultiStr<'a> {
+    #[must_use]
+    fn strs(&self) -> impl Iterator<Item = &'a str>;
+}
+
+impl<'b, 'c> MultiStr<'c> for &'b [&'c str] {
+    fn strs(&self) -> impl Iterator<Item = &'c str> {
+        self.iter().copied()
+    }
+}
+
+impl<'b, 'c, const N: usize> MultiStr<'c> for &'b [&'c str; N] {
+    fn strs(&self) -> impl Iterator<Item = &'c str> {
+        self.iter().copied()
+    }
+}
+
+impl<'c, const N: usize> MultiStr<'c> for [&'c str; N] {
+    fn strs(&self) -> impl Iterator<Item = &'c str> {
+        self.iter().copied()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct MultiStrPat<'a, T: MultiStr<'a>>(T, PhantomData<&'a str>);
+
+impl<'a, 'b, T: MultiStr<'b>> Pattern<'a> for MultiStrPat<'b, T> {
+    type Searcher = MultiStrSearcher<'a, 'b, T>;
+
+    #[inline]
+
+    fn into_searcher(self, haystack: &'a str) -> Self::Searcher {
+        MultiStrSearcher {
+            haystack,
+            needles: self.0,
+            fw_idx: 0,
+            fw_matched: false,
+            bw_idx: haystack.len(),
+            bw_matched: false,
+            marker: PhantomData,
+        }
+    }
+
+    #[inline]
+    fn is_contained_in(self, haystack: &'a str) -> bool {
+        self.0.strs().any(|needle| haystack.contains(needle))
+    }
+
+    #[inline]
+    fn is_prefix_of(self, haystack: &'a str) -> bool {
+        self.0.strs().any(|needle| haystack.starts_with(needle))
+    }
+
+    #[inline]
+    fn is_suffix_of(self, haystack: &'a str) -> bool {
+        self.0.strs().any(|needle| haystack.ends_with(needle))
+    }
+
+    #[inline]
+    fn strip_prefix_of(self, haystack: &'a str) -> Option<&'a str> {
+        for needle in self.0.strs() {
+            if let Some(suffix) = haystack.strip_prefix(needle) {
+                return Some(suffix);
+            }
+        }
+        None
+    }
+
+    #[inline]
+    fn strip_suffix_of(self, haystack: &'a str) -> Option<&'a str> {
+        for needle in self.0.strs() {
+            if let Some(prefix) = haystack.strip_suffix(needle) {
+                return Some(prefix);
+            }
+        }
+        None
+    }
+}
+
+#[derive(Clone, Debug)]
+struct MultiStrSearcher<'a, 'b, T: MultiStr<'b>> {
+    haystack: &'a str,
+    needles: T,
+    fw_idx: usize,
+    fw_matched: bool,
+    bw_idx: usize,
+    bw_matched: bool,
+    marker: PhantomData<&'b str>,
+}
+
+unsafe impl<'a, 'b, T: MultiStr<'b>> Searcher<'a> for MultiStrSearcher<'a, 'b, T> {
+    #[inline]
+    fn haystack(&self) -> &'a str {
+        self.haystack
+    }
+
+    fn next(&mut self) -> SearchStep {
+        if self.fw_idx == self.bw_idx {
+            // Empty haystack
+            let ret = if !(self.fw_matched || self.bw_matched)
+                && self.needles.strs().any(str::is_empty)
+            {
+                SearchStep::Match(self.fw_idx, self.bw_idx)
+            } else {
+                SearchStep::Done
+            };
+            self.fw_matched = true;
+            ret
+        } else {
+            let haystack = unsafe { self.haystack.get_unchecked(self.fw_idx..self.bw_idx) };
+            for needle in self.needles.strs() {
+                if needle.is_empty() {
+                    if self.fw_matched {
+                        continue;
+                    } else {
+                        self.fw_matched = true;
+                        return SearchStep::Match(self.fw_idx, self.fw_idx);
+                    }
+                } else if haystack.starts_with(needle) {
+                    let old_fw_idx = self.fw_idx;
+                    self.fw_idx += needle.len();
+                    self.fw_matched = !self.fw_matched;
+                    return SearchStep::Match(old_fw_idx, self.fw_idx);
+                }
+            }
+            let old_fw_idx = self.fw_idx;
+            self.fw_idx += unsafe {
+                let mut indices = haystack.char_indices();
+                indices.next();
+                indices.next().unwrap_unchecked().0
+            };
+            self.fw_matched = false;
+            SearchStep::Reject(old_fw_idx, self.fw_idx)
+        }
+    }
+}
+
+unsafe impl<'a, 'b, T: MultiStr<'b>> ReverseSearcher<'a> for MultiStrSearcher<'a, 'b, T> {
+    fn next_back(&mut self) -> SearchStep {
+        if self.fw_idx == self.bw_idx {
+            // Empty haystack
+            let ret = if !(self.bw_matched || self.fw_matched)
+                && self.needles.strs().any(str::is_empty)
+            {
+                SearchStep::Match(self.fw_idx, self.bw_idx)
+            } else {
+                SearchStep::Done
+            };
+            self.bw_matched = true;
+            ret
+        } else {
+            let haystack = unsafe { self.haystack.get_unchecked(self.fw_idx..self.bw_idx) };
+            for needle in self.needles.strs() {
+                if needle.is_empty() {
+                    if self.bw_matched {
+                        continue;
+                    } else {
+                        self.bw_matched = true;
+                        return SearchStep::Match(self.bw_idx, self.bw_idx);
+                    }
+                } else if haystack.ends_with(needle) {
+                    let old_bw_idx = self.bw_idx;
+                    self.bw_idx -= needle.len();
+                    self.bw_matched = !self.bw_matched;
+                    return SearchStep::Match(self.bw_idx, old_bw_idx);
+                }
+            }
+            let old_bw_idx = self.bw_idx;
+            self.bw_idx = unsafe {
+                self.haystack
+                    .get_unchecked(..self.bw_idx)
+                    .char_indices()
+                    .next_back()
+                    .unwrap_unchecked()
+                    .0
+            };
+            self.bw_matched = false;
+            SearchStep::Reject(self.bw_idx, old_bw_idx)
+        }
     }
 }

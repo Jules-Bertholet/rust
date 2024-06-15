@@ -1121,7 +1121,7 @@ impl str {
     ///
     /// Returns `false` if it does not.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1146,10 +1146,12 @@ impl str {
     ///
     /// Returns `false` if it does not.
     ///
-    /// The [pattern] can be a `&str`, in which case this function will return true if
-    /// the `&str` is a prefix of this string slice.
+    /// The [pattern] can be a `&str`, in which case this function will return `true` if
+    /// the `&str` is a prefix of this string slice. It can also be an array or slice
+    /// of `&str`, in which case this function will return `true` if any of the entries
+    /// is a prefix.
     ///
-    /// The [pattern] can also be a [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can also be a [`char`], an array or slice of [`char`]s, or a
     /// function or closure that determines if a character matches.
     /// These will only be checked against the first character of this string slice.
     /// Look at the second example below regarding behavior for slices of [`char`]s.
@@ -1183,7 +1185,7 @@ impl str {
     ///
     /// Returns `false` if it does not.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1210,7 +1212,7 @@ impl str {
     ///
     /// Returns [`None`] if the pattern doesn't match.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1258,7 +1260,7 @@ impl str {
     ///
     /// Returns [`None`] if the pattern doesn't match.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1305,7 +1307,7 @@ impl str {
     /// An iterator over substrings of this string slice, separated by
     /// characters matched by a pattern.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1346,11 +1348,29 @@ impl str {
     /// assert_eq!(v, ["lion", "tiger", "leopard"]);
     /// ```
     ///
-    /// If the pattern is a slice of chars, split on each occurrence of any of the characters:
+    /// If the pattern is an array or slice of chars, split on each occurrence of any of the characters:
     ///
     /// ```
-    /// let v: Vec<&str> = "2020-11-03 23:59".split(&['-', ' ', ':', '@'][..]).collect();
+    /// let v: Vec<&str> = "2020-11-03 23:59".split(['-', ' ', ':', '@']).collect();
     /// assert_eq!(v, ["2020", "11", "03", "23", "59"]);
+    /// ```
+    ///
+    /// If the pattern is an array or slice of strings, split on each occurrence of any of the strings:
+    ///
+    /// ```
+    /// let v: Vec<&str> = "a | b, c".split([" | ", ", "]).collect();
+    /// assert_eq!(v, ["a", "b", "c"]);
+    /// ```
+    ///
+    /// If one of the strings in the array or slice is a substring of another,
+    /// the string that comes earlier in the list is considered first:
+    ///
+    /// ```
+    /// let v: Vec<&str> = "a\nb\r\nc\rd".split(["\r\n", "\r", "\n"]).collect();
+    /// assert_eq!(v, ["a", "b", "c", "d"]);
+    ///
+    /// let v: Vec<&str> = "a\nb\r\nc\rd".split(["\r", "\n", "\r\n"]).collect();
+    /// assert_eq!(v, ["a", "b", "", "c", "d"]);
     /// ```
     ///
     /// A more complex pattern, using a closure:
@@ -1394,6 +1414,23 @@ impl str {
     /// ```
     /// let f: Vec<_> = "rust".split("").collect();
     /// assert_eq!(f, &["", "r", "u", "s", "t", ""]);
+    ///
+    /// let f: Vec<_> = "".split("").collect();
+    /// assert_eq!(f, &["", ""]);
+    /// ```
+    ///
+    /// When empty strings are used as part of a list of separators,
+    /// no range in the haystack can serve as a separation point more than once:
+    ///
+    /// ```
+    /// let f: Vec<_> = "rust".split(["", ""]).collect();
+    /// assert_eq!(f, &["", "r", "u", "s", "t", ""]);
+    ///
+    /// let f: Vec<_> = "rust".split(["", "u"]).collect();
+    /// assert_eq!(f, &["", "r", "", "", "s", "t", ""]);
+    ///
+    /// let f: Vec<_> = "rust".split(["u", ""]).collect();
+    /// assert_eq!(f, &["", "r", "s", "t", ""]);
     /// ```
     ///
     /// Contiguous separators can lead to possibly surprising behavior
@@ -1432,7 +1469,7 @@ impl str {
     /// `split` in that `split_inclusive` leaves the matched part as the
     /// terminator of the substring.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1470,7 +1507,7 @@ impl str {
     /// An iterator over substrings of the given string slice, separated by
     /// characters matched by a pattern and yielded in reverse order.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1522,7 +1559,7 @@ impl str {
     /// An iterator over substrings of the given string slice, separated by
     /// characters matched by a pattern.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1568,7 +1605,7 @@ impl str {
     /// An iterator over substrings of `self`, separated by characters
     /// matched by a pattern and yielded in reverse order.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1620,7 +1657,7 @@ impl str {
     /// If `n` substrings are returned, the last substring (the `n`th substring)
     /// will contain the remainder of the string.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1673,7 +1710,7 @@ impl str {
     /// If `n` substrings are returned, the last substring (the `n`th substring)
     /// will contain the remainder of the string.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1761,7 +1798,7 @@ impl str {
     /// An iterator over the disjoint matches of a pattern within the given string
     /// slice.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1796,7 +1833,7 @@ impl str {
     /// An iterator over the disjoint matches of a pattern within this string slice,
     /// yielded in reverse order.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1836,7 +1873,7 @@ impl str {
     /// For matches of `pat` within `self` that overlap, only the indices
     /// corresponding to the first match are returned.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -1877,7 +1914,7 @@ impl str {
     /// For matches of `pat` within `self` that overlap, only the indices
     /// corresponding to the last match are returned.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -2144,7 +2181,7 @@ impl str {
     /// Returns a string slice with all prefixes that match a pattern
     /// repeatedly removed.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -2186,7 +2223,7 @@ impl str {
     ///
     /// If the string does not start with `prefix`, returns `None`.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -2213,7 +2250,7 @@ impl str {
     ///
     /// If the string does not end with `suffix`, returns `None`.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -2240,7 +2277,7 @@ impl str {
     /// Returns a string slice with all suffixes that match a pattern
     /// repeatedly removed.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -2289,7 +2326,7 @@ impl str {
     /// Returns a string slice with all prefixes that match a pattern
     /// repeatedly removed.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
@@ -2324,7 +2361,7 @@ impl str {
     /// Returns a string slice with all suffixes that match a pattern
     /// repeatedly removed.
     ///
-    /// The [pattern] can be a `&str`, [`char`], a slice of [`char`]s, or a
+    /// The [pattern] can be a `&str`, [`char`], an array or slice of these, or a
     /// function or closure that determines if a character matches.
     ///
     /// [`char`]: prim@char
