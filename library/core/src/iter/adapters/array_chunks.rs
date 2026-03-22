@@ -47,10 +47,16 @@ where
     #[unstable(feature = "iter_array_chunks", issue = "100450")]
     #[inline]
     pub fn into_remainder(mut self) -> array::IntoIter<I::Item, N> {
+        self.take_remainder()
+    }
+
+    #[unstable(feature = "iter_array_chunks", issue = "100450")]
+    #[inline]
+    pub fn take_remainder(&mut self) -> array::IntoIter<I::Item, N> {
         if self.remainder.is_none() {
             while let Some(_) = self.next() {}
         }
-        self.remainder.unwrap_or_default()
+        self.remainder.take().unwrap_or_default()
     }
 }
 
