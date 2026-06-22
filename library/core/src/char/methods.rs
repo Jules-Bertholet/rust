@@ -1266,9 +1266,27 @@ impl char {
     /// [described]: https://www.unicode.org/versions/latest/core-spec/chapter-3/#G41165
     /// [specified]: https://www.unicode.org/reports/tr44/#Grapheme_Extend
     /// [`DerivedCoreProperties.txt`]: https://www.unicode.org/Public/UCD/latest/ucd/DerivedCoreProperties.txt
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// #![feature(grapheme_extend)]
+    /// assert!('\u{0300}'.is_grapheme_extend());
+    /// assert!('\u{0BD7}'.is_grapheme_extend());
+    /// assert!('\u{200D}'.is_grapheme_extend());
+    /// assert!('\u{200E}'.is_grapheme_extend());
+    /// assert!('\u{FF9E}'.is_grapheme_extend());
+    /// assert!('\u{FF9F}'.is_grapheme_extend());
+    /// assert!(!'A'.is_grapheme_extend());
+    /// assert!(!' '.is_grapheme_extend());
+    /// assert!(!'á'.is_grapheme_extend());
+    /// ```
     #[must_use]
+    #[unstable(feature = "grapheme_extend", issue = "none")]
     #[inline]
-    fn is_grapheme_extender(self) -> bool {
+    pub fn is_grapheme_extender(self) -> bool {
         self > '\u{02FF}' && unicode::Grapheme_Extend(self)
     }
 
