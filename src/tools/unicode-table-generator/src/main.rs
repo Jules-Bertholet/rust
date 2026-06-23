@@ -88,24 +88,27 @@ mod unicode_download;
 use fmt_helpers::CharEscape;
 use raw_emitter::{RawEmitter, emit_codepoints, emit_whitespace};
 
-static PROPERTIES: &[&str] = &[
+/// If `.1` is `false`, we only generate test tables
+static PROPERTIES: &[(&str, bool)] = &[
     // tidy-alphabetical-start
-    "Alphabetic",
-    "Case_Ignorable",
-    "Cf",
-    "Cn_Planes_0_3",
-    "Default_Ignorable_Code_Point",
-    "Grapheme_Extend",
-    "Lowercase",
-    "Lt",
-    "N",
-    "Uppercase",
-    "White_Space",
+    ("Alphabetic", true),
+    ("Case_Ignorable", true),
+    ("Cf", true),
+    ("Cn_Planes_0_3", true),
+    ("Default_Ignorable_Code_Point", true),
+    ("Grapheme_Base", false),
+    ("Grapheme_Extend", true),
+    ("Lowercase", true),
+    ("Lt", true),
+    ("N", true),
+    ("Uppercase", true),
+    ("White_Space", true),
     // tidy-alphabetical-end
 ];
 
 struct UnicodeData {
-    ranges: Vec<(&'static str, Vec<Range<u32>>)>,
+    /// (property_name, ranges, whether to generate data tables (as opposed to only test tables))
+    ranges: Vec<(&'static str, Vec<Range<u32>>, bool)>,
     /// Only stores mappings that are not to self
     to_upper: BTreeMap<u32, [u32; 3]>,
     /// Only stores mappings that differ from `to_upper`
@@ -137,12 +140,12 @@ fn load_data() -> UnicodeData {
 
     let mut properties = FxHashMap::default();
     for row in ucd_parse::parse::<_, ucd_parse::CoreProperty>(&UNICODE_DIRECTORY).unwrap() {
-        if let Some(name) = PROPERTIES.iter().find(|prop| **prop == row.property.as_str()) {
+        if let Some(name) = PROPERTIES.iter().find(|&(prop, _)| *prop == row.property.as_str()) {
             properties.entry(*name).or_insert_with(Vec::new).push(row.codepoints);
         }
     }
     for row in ucd_parse::parse::<_, ucd_parse::Property>(&UNICODE_DIRECTORY).unwrap() {
-        if let Some(name) = PROPERTIES.iter().find(|prop| **prop == row.property.as_str()) {
+        if let Some(name) = PROPERTIES.iter().find(|&(prop, _)| *prop == row.property.as_str()) {
             properties.entry(*name).or_insert_with(Vec::new).push(row.codepoints);
         }
     }
@@ -165,7 +168,7 @@ fn load_data() -> UnicodeData {
             assigned_chars.insert(row.codepoint.value());
         }
 
-        if let Some(name) = PROPERTIES.iter().find(|prop| **prop == general_category) {
+        if let Some(name) = PROPERTIES.iter().find(|prop| prop.0 == general_category) {
             properties
                 .entry(*name)
                 .or_insert_with(Vec::new)
@@ -193,7 +196,10 @@ fn load_data() -> UnicodeData {
     for c in '\0'..='\u{3FFFD}' {
         let cp = Codepoint::from_u32(c.into()).unwrap();
         if !assigned_chars.contains(&cp.value()) {
-            properties.entry("Cn_Planes_0_3").or_insert_with(Vec::new).push(Codepoints::Single(cp));
+            properties
+                .entry(("Cn_Planes_0_3", true))
+                .or_insert_with(Vec::new)
+                .push(Codepoints::Single(cp));
         }
     }
 
@@ -301,9 +307,9 @@ fn load_data() -> UnicodeData {
     // Filter out ASCII codepoints.
     to_lower.retain(|&c, _| c > 0x7f);
     to_upper.retain(|&c, _| c > 0x7f);
-    let mut properties: Vec<(&'static str, Vec<Range<u32>>)> = properties
+    let mut properties: Vec<(&'static str, Vec<Range<u32>>, bool)> = properties
         .into_iter()
-        .map(|(prop, codepoints)| {
+        .map(|((prop, generate_data), codepoints)| {
             let codepoints = codepoints
                 .into_iter()
                 .flatten()
@@ -311,7 +317,7 @@ fn load_data() -> UnicodeData {
                 .filter(|c| !c.is_ascii())
                 .map(u32::from)
                 .collect::<Vec<_>>();
-            (prop, ranges_from_set(&codepoints))
+            (prop, ranges_from_set(&codepoints), generate_data)
         })
         .collect();
 
@@ -344,11 +350,14 @@ fn main() {
 
     let mut total_bytes = 0;
     let mut modules = Vec::new();
-    for (property, ranges) in ranges_by_property {
+    for (property, ranges) in ranges_by_property
+        .iter()
+        .filter_map(|&(property, ref ranges, gen_tables)| gen_tables.then_some((property, ranges)))
+    {
         let datapoints = ranges.iter().map(|r| r.end - r.start).sum::<u32>();
 
         let mut emitter = RawEmitter::new();
-        if property == &"White_Space" {
+        if property == "White_Space" {
             emit_whitespace(&mut emitter, ranges);
         } else {
             emit_codepoints(&mut emitter, ranges);
@@ -452,7 +461,7 @@ fn generate_tests(data: &UnicodeData) -> String {
 use std::ops::RangeInclusive;
 ",
     );
-    for (property, ranges) in &data.ranges {
+    for (property, ranges, _) in &data.ranges {
         let prop_upper = property.to_uppercase();
         let is_true = (char::MIN..=char::MAX)
             .filter(|c| !c.is_ascii())

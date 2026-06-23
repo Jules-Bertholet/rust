@@ -1258,6 +1258,32 @@ impl char {
         self > '\u{AC}' && unicode::Default_Ignorable_Code_Point(self)
     }
 
+    /// Returns `true` if this `char` has the `Grapheme_Base` property.
+    ///
+    /// `Grapheme_Base` is [described] in Chapter 3 (Conformance) of the Unicode Standard,
+    /// and [specified] in the Unicode Character Database [`DerivedCoreProperties.txt`].
+    ///
+    /// [described]: https://www.unicode.org/versions/latest/core-spec/chapter-3/#G38162
+    /// [specified]: https://www.unicode.org/reports/tr44/#Grapheme_Base
+    /// [`DerivedCoreProperties.txt`]: https://www.unicode.org/Public/UCD/latest/ucd/DerivedCoreProperties.txt
+    #[must_use]
+    #[unstable(feature = "grapheme_extend", issue = "none")]
+    #[inline]
+    pub fn is_grapheme_base(self) -> bool {
+        match self {
+            '\0'..='\x1F' => false,  // ASCII controls other than DEL
+            '\x20'..='\x7E' => true, // Non-control ASCII chars
+            // ASCII DEL, non-ASCII controls, LINE SEPARATOR, and PARAGRAPH SEPARATOR
+            '\x7F'..='\u{9F}' | '\u{2028}' | '\u{2029}' => false,
+            _ => {
+                !self.is_grapheme_extender()
+                    && !self.is_format_control()
+                    && !self.is_unassigned()
+                    && !self.is_private_use()
+            }
+        }
+    }
+
     /// Returns `true` if this `char` has the `Grapheme_Extend` property.
     ///
     /// `Grapheme_Extend` is [described] in Chapter 3 (Conformance) of the Unicode Standard,
@@ -1273,15 +1299,15 @@ impl char {
     ///
     /// ```
     /// #![feature(grapheme_extend)]
-    /// assert!('\u{0300}'.is_grapheme_extend());
-    /// assert!('\u{0BD7}'.is_grapheme_extend());
-    /// assert!('\u{200D}'.is_grapheme_extend());
-    /// assert!('\u{200E}'.is_grapheme_extend());
-    /// assert!('\u{FF9E}'.is_grapheme_extend());
-    /// assert!('\u{FF9F}'.is_grapheme_extend());
-    /// assert!(!'A'.is_grapheme_extend());
-    /// assert!(!' '.is_grapheme_extend());
-    /// assert!(!'á'.is_grapheme_extend());
+    /// assert!('\u{0300}'.is_grapheme_extender());
+    /// assert!('\u{0BD7}'.is_grapheme_extender());
+    /// assert!('\u{200D}'.is_grapheme_extender());
+    /// assert!('\u{200E}'.is_grapheme_extender());
+    /// assert!('\u{FF9E}'.is_grapheme_extender());
+    /// assert!('\u{FF9F}'.is_grapheme_extender());
+    /// assert!(!'A'.is_grapheme_extender());
+    /// assert!(!' '.is_grapheme_extender());
+    /// assert!(!'á'.is_grapheme_extender());
     /// ```
     #[must_use]
     #[unstable(feature = "grapheme_extend", issue = "none")]

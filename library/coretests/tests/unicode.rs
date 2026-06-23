@@ -82,6 +82,12 @@ fn default_ignorable_code_point() {
 
 #[test]
 #[cfg_attr(miri, ignore)] // Miri is too slow
+fn grapheme_base() {
+    test_boolean_property(test_data::GRAPHEME_BASE, char::is_grapheme_base);
+}
+
+#[test]
+#[cfg_attr(miri, ignore)] // Miri is too slow
 fn grapheme_extend() {
     test_boolean_property(test_data::GRAPHEME_EXTEND, unicode_data::grapheme_extend::lookup);
 }
